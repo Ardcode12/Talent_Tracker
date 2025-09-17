@@ -1,0 +1,185 @@
+import React, { useRef, useEffect } from 'react';
+import {
+  Animated,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Dimensions,
+  Platform,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Theme } from '../constants/Theme';
+import { BlurView } from 'expo-blur';
+
+const { width } = Dimensions.get('window');
+
+interface FloatingActionCardProps {
+  icon: string;
+  title: string;
+  subtitle: string;
+  color: string;
+  delay?: number;
+  onPress?: () => void;
+}
+
+export const FloatingActionCard: React.FC<FloatingActionCardProps> = ({
+  icon,
+  title,
+  subtitle,
+  color,
+  delay = 0,
+  onPress,
+}) => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Entry animation
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 20,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Floating animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: 1,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [delay]);
+
+  const handlePressIn = () => {
+    Animated.spring(animatedValue, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(animatedValue, {
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const scale = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.95],
+  });
+
+  const translateY = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -10],
+  });
+
+  return (
+    <TouchableOpacity
+      activeOpacity={1}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+    >
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            transform: [
+              { scale: Animated.multiply(scale, scaleAnim) },
+              { translateY },
+            ],
+          },
+        ]}
+      >
+        <View style={[styles.card, { borderColor: color }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView
+              intensity={20}
+              style={StyleSheet.absoluteFillObject}
+              tint="dark"
+            />
+          )}
+          
+          <View style={[styles.iconBg, { backgroundColor: `${color}20` }]}>
+            <View style={[styles.iconCircle, { backgroundColor: color }]}>
+              <Ionicons name={icon as any} size={32} color={Theme.colors.text} />
+            </View>
+          </View>
+          
+          <View style={styles.content}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
+          </View>
+          
+          <Ionicons name="chevron-forward" size={24} color={color} />
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    width: width - Theme.spacing.xl * 2,
+    marginHorizontal: Theme.spacing.xl,
+    marginVertical: Theme.spacing.md,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.lg,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
+    overflow: 'hidden',
+  },
+  iconBg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Theme.spacing.lg,
+  },
+  iconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  content: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Theme.colors.text,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+  },
+});

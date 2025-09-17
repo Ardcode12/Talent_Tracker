@@ -1,0 +1,68 @@
+# -----------------------------
+# Global
+# -----------------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+# Python (backend/)
+# -----------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+*.log
+
+# Virtual environment
+venv/
+env/
+
+# Environment variables
+.env
+
+# User uploads (images, docs, etc.)
+backend/uploads/
+
+# -----------------------------
+# Node / React Native (frontend/)
+# -----------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo & Metro bundler cache
+.expo/
+.expo-shared/
+.expo/*
+web-build/
+dist/
+.cache/
+.packager/
+
+# Logs
+*.log
+logs/
+
+# OS / IDE
+.vscode/
+.idea/
+*.swp
+
+# -----------------------------
+# Build Artifacts
+# -----------------------------
+frontend/android/
+frontend/ios/
+frontend/build/
+frontend/web-build/
+
+# -----------------------------
+# Misc
+# -----------------------------
+*.iml
+*.tmp
+*.temp
