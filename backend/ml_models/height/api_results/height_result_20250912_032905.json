@@ -1,0 +1,24 @@
+{
+  "height_cm": 180.0,
+  "height_pixels": 1732.4,
+  "height_ratio": 0.884,
+  "confidence": 0.922,
+  "landmarks_detected": true,
+  "head_top_y": 0.044,
+  "feet_bottom_y": 0.928,
+  "landmark_visibility": {
+    "nose": 0.998,
+    "ears": 0.998,
+    "ankles": 0.957,
+    "heels": 0.773
+  },
+  "timestamp": "2025-09-12T03:29:05.468360",
+  "image_filename": "image.png",
+  "image_size": "1307x1960",
+  "actual_height": null,
+  "processing_info": {
+    "mediapipe_version": "0.10.21",
+    "method": "pose_landmarks",
+    "model_complexity": 2
+  }
+}

@@ -1,0 +1,9 @@
+{
+    "height_cm": 270.75,
+    "height_pixels": 928.29,
+    "confidence": 0.986,
+    "landmarks_detected": true,
+    "head_top_y": 0.195,
+    "feet_bottom_y": 0.92,
+    "timestamp": "2025-09-12T03:36:38.059495"
+}

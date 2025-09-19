@@ -1,0 +1,65 @@
+{
+  "height_cm": 161.8,
+  "confidence": 0.888,
+  "validation_score": 0.867,
+  "calculation_methods": {
+    "anthropometric": 167.0,
+    "proportional": 128.8,
+    "segmental": 294.3,
+    "geometric": 158.2,
+    "facial": 154.3,
+    "skeletal": 135.3
+  },
+  "camera_analysis": {
+    "estimated_fov": 45,
+    "pixel_to_cm_ratio": 0.1325499847474838,
+    "camera_distance_estimate": 410.41630560342617,
+    "image_center": [
+      600.0,
+      799.5
+    ],
+    "person_center": [
+      0.5073450207710266,
+      0.5594380795955658
+    ]
+  },
+  "perspective_correction": {
+    "horizontal_offset": -599.492654979229,
+    "vertical_offset": -798.9405619204044,
+    "correction_factor": 1.1498804557498468,
+    "distortion_level": 0.9993002650661719
+  },
+  "accuracy_estimate": "\u00b13-6 cm (Very Good)",
+  "timestamp": "2025-09-12T01:39:03.282730",
+  "image_path": "test_images\\WhatsApp Image 2025-09-12 at 00.42.29_4219736e.jpg",
+  "method": "ultra_accurate_multi_method_fusion",
+  "all_method_results": {
+    "anthropometric": 166.99450202963098,
+    "proportional": 128.84224322379515,
+    "segmental": 294.33554285477265,
+    "geometric": 158.17397039504735,
+    "facial": 154.25707554108988,
+    "skeletal": 135.2995414843081
+  },
+  "anthropometric_ratios_used": {
+    "head_to_total": 0.125,
+    "face_to_head": 0.65,
+    "eye_to_chin": 0.45,
+    "shoulder_width_to_height": 0.259,
+    "arm_span_to_height": 1.0,
+    "torso_to_total": 0.52,
+    "leg_to_total": 0.48,
+    "head_shoulder_ratio": 0.14,
+    "shoulder_hip_ratio": 0.26,
+    "hip_knee_ratio": 0.26,
+    "knee_ankle_ratio": 0.26,
+    "ankle_ground_ratio": 0.08
+  },
+  "processing_notes": [
+    "Used 6 independent calculation methods",
+    "Applied advanced image preprocessing",
+    "Performed perspective correction",
+    "Used scientific anthropometric ratios",
+    "Applied statistical validation"
+  ]
+}

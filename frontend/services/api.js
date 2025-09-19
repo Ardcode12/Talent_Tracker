@@ -9,7 +9,7 @@ const getApiUrl = () => {
     // Replace this with YOUR computer's IP address
     // To find your IP on Windows: run 'ipconfig' in cmd
     // Look for IPv4 Address under your active network adapter
-    return 'http://10.222.108.35:8000'; // UPDATE THIS WITH YOUR IP
+    return 'http://10.48.106.35:8000'; // UPDATE THIS WITH YOUR IP
   }
 };
 
@@ -37,6 +37,19 @@ export const getImageUrl = (imagePath) => {
   
   return `${BASE_URL}/${imagePath}`;
 };
+
+export async function apiFetch(path, options = {}) {
+  const token = await AsyncStorage.getItem("token");
+  console.log("🔑 Using token:", token);
+  return fetch(API_URL + path, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+}
 
 class ApiService {
   static async login(email, password) {
@@ -207,31 +220,33 @@ class ApiService {
   }
 
   // Assessment methods
-  static async uploadAssessment(formData) {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await fetch(`${API_BASE_URL}/assessments`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${token}` 
-        },
-        body: formData,
-      });
-      
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.detail || 'Upload failed');
-      }
-      return data;
-    } catch (error) {
-      console.error('Assessment upload error:', error);
-      throw error;
+  // Replace the uploadAssessment function with this:
+static async uploadAssessment(formData) {
+  try {
+    const token = await AsyncStorage.getItem('authToken');
+    if (!token) {
+      throw new Error('Authentication required');
     }
+
+    // ✅ Correct endpoint with /upload
+    const response = await fetch(`${API_BASE_URL}/assessments/upload`, {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${token}` 
+      },
+      body: formData,
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'Upload failed');
+    }
+    return data;
+  } catch (error) {
+    console.error('Assessment upload error:', error);
+    throw error;
   }
+}
 
   static async getAssessments(testType = null) {
     try {
@@ -272,29 +287,44 @@ return data;
   }
 
   static async getAssessmentStats() {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
-        return null;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/assessments/stats`, {
-        headers: { 
-          'Authorization': `Bearer ${token}` 
-        },
-      });
-      
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.detail || 'Fetch failed');
-      }
-      return data;
-    } catch (error) {
-      console.error('Get assessment stats error:', error);
+  try {
+    const token = await AsyncStorage.getItem('authToken');
+    if (!token) {
+      console.log('No auth token found for assessment stats');
       return null;
     }
-  }
 
+    const response = await fetch(`${API_BASE_URL}/assessments/stats`, {
+      headers: { 
+        'Authorization': `Bearer ${token}` 
+      },
+    });
+
+    if (response.status === 401) {
+      console.log('Authentication failed for assessment stats');
+      return null;
+    }
+
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (err) {
+      console.error("Stats parse error:", text);
+      return null;
+    }
+
+    if (!response.ok) {
+      console.error('Assessment stats error:', data.detail || 'Fetch failed');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Get assessment stats error:', error);
+    return null;
+  }
+}
   // Additional useful methods
   static async getCurrentUser() {
     try {

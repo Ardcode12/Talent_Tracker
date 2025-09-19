@@ -1,0 +1,8 @@
+{
+    "conversion": "dynamic_range_quant",
+    "input_shape": [
+        1,
+        300,
+        6
+    ]
+}

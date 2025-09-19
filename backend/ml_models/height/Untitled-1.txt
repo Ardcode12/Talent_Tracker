@@ -1,0 +1,171 @@
+d:/sportify app/frontend/
+├─] .expo/ (ignored)
+├── .gitignore
+├── .vscode/
+│   └── settings.json
+├── android/
+│   ├── .gitignore
+│   ├── app/
+│   │   ├── build.gradle
+│   │   ├── debug.keystore
+│   │   ├── proguard-rules.pro
+│   │   └── src/
+│   │       ├── debug/
+│   │       │   └── AndroidManifest.xml
+│   │       └── main/
+│   │           ├── AndroidManifest.xml
+│   │           ├── java/
+│   │           │   └── com/
+│   │           │       └── anonymous/
+│   │           │           └── aisportify/
+│   │           │               ├── MainActivity.kt
+│   │           │               └── MainApplication.kt
+│   │           └── res/
+│   │               ├── drawable/
+│   │               │   ├── ic_launcher_background.xml
+│   │               │   └── rn_edit_text_material.xml
+│   │               ├── drawable-hdpi/
+│   │               │   └── splashscreen_logo.png
+│   │               ├── drawable-mdpi/
+│   │               │   └── splashscreen_logo.png
+│   │               ├── drawable-xhdpi/
+│   │               │   └── splashscreen_logo.png
+│   │               ├── drawable-xxhdpi/
+│   │               │   └── splashscreen_logo.png
+│   │               ├── drawable-xxxhdpi/
+│   │               │   └── splashscreen_logo.png
+│   │               ├── mipmap-anydpi-v26/
+│   │               │   ├── ic_launcher.xml
+│   │               │   └── ic_launcher_round.xml
+│   │               ├── mipmap-hdpi/
+│   │               │   ├── ic_launcher.webp
+│   │               │   ├── ic_launcher_foreground.webp
+│   │               │   └── ic_launcher_round.webp
+│   │               ├── mipmap-mdpi/
+│   │               │   ├── ic_launcher.webp
+│   │               │   ├── ic_launcher_foreground.webp
+│   │               │   └── ic_launcher_round.webp
+│   │               ├── mipmap-xhdpi/
+│   │               │   ├── ic_launcher.webp
+│   │               │   ├── ic_launcher_foreground.webp
+│   │               │   └── ic_launcher_round.webp
+│   │               ├── mipmap-xxhdpi/
+│   │               │   ├── ic_launcher.webp
+│   │               │   ├── ic_launcher_foreground.webp
+│   │               │   └── ic_launcher_round.webp
+│   │               ├── mipmap-xxxhdpi/
+│   │               │   ├── ic_launcher.webp
+│   │               │   ├── ic_launcher_foreground.webp
+│   │               │   └── ic_launcher_round.webp
+│   │               ├── values/
+│   │               │   ├── colors.xml
+│   │               │   ├── strings.xml
+│   │               │   └── styles.xml
+│   │               └── values-night/
+│   │                   └── colors.xml
+│   ├─] build/ (ignored)
+│   ├── build.gradle
+│   ├── gradle/
+│   │   └── wrapper/
+│   │       ├── gradle-wrapper.jar
+│   │       └── gradle-wrapper.properties
+│   ├── gradle.properties
+│   ├── gradlew
+│   ├── gradlew.bat
+│   └── settings.gradle
+├── app/
+│   ├── (tabs)/
+│   │   ├── connections.tsx
+│   │   ├── explore.tsx
+│   │   ├── home.tsx
+│   │   ├── opportunities.tsx
+│   │   ├── profile.tsx
+│   │   └── _layout.tsx
+│   ├── +not-found.tsx
+│   ├── index.tsx
+│   ├── login.tsx
+│   └── _layout.tsx
+├── app.json
+├── assets/
+│   ├── fonts/
+│   │   └── SpaceMono-Regular.ttf
+│   └── images/
+│       ├── adaptive-icon.png
+│       ├── favicon.png
+│       ├── icon.png
+│       ├── partial-react-logo.png
+│       ├── react-logo.png
+│       ├── react-logo@2x.png
+│       ├── react-logo@3x.png
+│       └── splash-icon.png
+├── babel.config.js
+├── components/
+│   ├── AnimatedGradient.tsx
+│   ├── AnimatedPerformanceChart.tsx
+│   ├── AnimatedText.tsx
+│   ├── c
+│   ├── Collapsible.tsx
+│   ├── ConnectionCard3D.tsx
+│   ├── ExternalLink.tsx
+│   ├── FeedPostItem.tsx
+│   ├── FloatingActionMenu.tsx
+│   ├── GlassmorphicCard.tsx
+│   ├── GradientMask.tsx
+│   ├── GradientView.tsx
+│   ├── HapticTab.tsx
+│   ├── HelloWave.tsx
+│   ├── OpportunityFilterModal.tsx
+│   ├── ParallaxScrollView.tsx
+│   ├── ParticleBackground.tsx
+│   ├── PremiumCardStack.tsx
+│   ├── ScrollAnimatedView.tsx
+│   ├── ThemedText.tsx
+│   ├── ThemedView.tsx
+│   ├── ThemeToggle.tsx
+│   ├── ui/
+│   │   ├── IconSymbol.ios.tsx
+│   │   ├── IconSymbol.tsx
+│   │   ├── TabBarBackground.ios.tsx
+│   │   └── TabBarBackground.tsx
+│   ├── Ultra3DCard.tsx
+│   ├── UltraAnimatedFeedPost.tsx
+│   ├── UltraPremiumAnimations.tsx
+│   ├── UltraPremiumEffects.tsx
+│   └── Untitled-5.md
+├── constants/
+│   ├── Colors.ts
+│   ├── ProfessionalTheme.ts
+│   └── Theme.ts
+├── eslint.config.js
+├── frontend/
+│   ├── .gitignore
+│   ├── app.json
+│   ├── App.tsx
+│   ├── assets/
+│   │   ├── adaptive-icon.png
+│   │   ├── favicon.png
+│   │   ├── icon.png
+│   │   └── splash-icon.png
+│   ├── index.ts
+│   ├── package.json
+│   └── tsconfig.json
+├── hooks/
+│   ├── useColorScheme.ts
+│   ├── useColorScheme.web.ts
+│   ├── useScrollAnimations.ts
+│   └── useThemeColor.ts
+├── java.lang.Thread
+├── java.util.concurrent.ThreadPoolExecutor$Worker
+├─] node_modules/ (ignored)
+├── package-lock.json
+├── package.json
+├── README.md
+├── scripts/
+│   └── reset-project.js
+├── services/
+│   └── api.js
+├── tsconfig.json
+└── utils/
+    ├── animations.ts
+    ├── gradients.ts
+    └── opportunityAnimations.ts

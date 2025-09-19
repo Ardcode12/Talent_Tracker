@@ -1,0 +1,8 @@
+{
+    "conversion": "float32",
+    "input_shape": [
+        1,
+        300,
+        6
+    ]
+}

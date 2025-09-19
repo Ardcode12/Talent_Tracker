@@ -1,0 +1,24 @@
+{
+  "height_cm": 180.0,
+  "height_pixels": 529.0,
+  "height_ratio": 0.825,
+  "confidence": 0.857,
+  "landmarks_detected": true,
+  "head_top_y": 0.054,
+  "feet_bottom_y": 0.879,
+  "landmark_visibility": {
+    "nose": 1.0,
+    "ears": 0.999,
+    "ankles": 0.923,
+    "heels": 0.579
+  },
+  "timestamp": "2025-09-12T03:28:51.577559",
+  "image_filename": "usain.png",
+  "image_size": "480x641",
+  "actual_height": null,
+  "processing_info": {
+    "mediapipe_version": "0.10.21",
+    "method": "pose_landmarks",
+    "model_complexity": 2
+  }
+}

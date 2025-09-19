@@ -1,0 +1,65 @@
+{
+  "height_cm": 177.2,
+  "confidence": 0.499,
+  "validation_score": 0.867,
+  "calculation_methods": {
+    "anthropometric": 178.3,
+    "proportional": 141.9,
+    "segmental": 223.3,
+    "geometric": 171.4,
+    "facial": 177.4,
+    "skeletal": 162.0
+  },
+  "camera_analysis": {
+    "estimated_fov": 45,
+    "pixel_to_cm_ratio": 0.12239734012924676,
+    "camera_distance_estimate": 410.41630560342617,
+    "image_center": [
+      485.0,
+      798.5
+    ],
+    "person_center": [
+      0.4657655954360962,
+      0.5087358057498932
+    ]
+  },
+  "perspective_correction": {
+    "horizontal_offset": -484.5342344045639,
+    "vertical_offset": -797.9912641942501,
+    "correction_factor": 1.149872110139282,
+    "distortion_level": 0.9993628856534128
+  },
+  "accuracy_estimate": "\u00b17-12 cm (Fair)",
+  "timestamp": "2025-09-12T00:33:14.057147",
+  "image_path": "test_images\\dhoni.png",
+  "method": "ultra_accurate_multi_method_fusion",
+  "all_method_results": {
+    "anthropometric": 178.26380194142897,
+    "proportional": 141.90890940759192,
+    "segmental": 223.25988533278164,
+    "geometric": 171.3710787257418,
+    "facial": 177.37438276732567,
+    "skeletal": 162.03997244777844
+  },
+  "anthropometric_ratios_used": {
+    "head_to_total": 0.125,
+    "face_to_head": 0.65,
+    "eye_to_chin": 0.45,
+    "shoulder_width_to_height": 0.259,
+    "arm_span_to_height": 1.0,
+    "torso_to_total": 0.52,
+    "leg_to_total": 0.48,
+    "head_shoulder_ratio": 0.14,
+    "shoulder_hip_ratio": 0.26,
+    "hip_knee_ratio": 0.26,
+    "knee_ankle_ratio": 0.26,
+    "ankle_ground_ratio": 0.08
+  },
+  "processing_notes": [
+    "Used 6 independent calculation methods",
+    "Applied advanced image preprocessing",
+    "Performed perspective correction",
+    "Used scientific anthropometric ratios",
+    "Applied statistical validation"
+  ]
+}

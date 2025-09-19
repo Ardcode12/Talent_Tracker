@@ -1,0 +1,24 @@
+{
+  "height_cm": 180.0,
+  "height_pixels": 1449.3,
+  "height_ratio": 0.907,
+  "confidence": 0.76,
+  "landmarks_detected": true,
+  "head_top_y": 0.031,
+  "feet_bottom_y": 0.939,
+  "landmark_visibility": {
+    "nose": 0.999,
+    "ears": 0.999,
+    "ankles": 0.663,
+    "heels": 0.498
+  },
+  "timestamp": "2025-09-12T03:28:06.348781",
+  "image_filename": "dhoni.png",
+  "image_size": "970x1597",
+  "actual_height": null,
+  "processing_info": {
+    "mediapipe_version": "0.10.21",
+    "method": "pose_landmarks",
+    "model_complexity": 2
+  }
+}

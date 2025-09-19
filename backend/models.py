@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 
+
 # Association tables
 post_likes = Table(
     'post_likes',
@@ -152,7 +153,7 @@ class Assessment(Base):
     video_url = Column(String(500), nullable=True)
     score = Column(Float, nullable=True)
     ai_score = Column(Float, nullable=True)
-    feedback = Column(Text, nullable=True)
+    ai_feedback = Column(Text, nullable=True)
     status = Column(String(50), default="pending")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

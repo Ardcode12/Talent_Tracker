@@ -1,0 +1,23 @@
+{
+    "input_shape": [
+        300,
+        6
+    ],
+    "num_classes": 3,
+    "class_map": {
+        "0": "start",
+        "1": "mid",
+        "2": "finish"
+    },
+    "training_config": {
+        "epochs": 50,
+        "batch_size": 32,
+        "optimizer": "adam",
+        "loss": "categorical_crossentropy",
+        "metrics": [
+            "accuracy"
+        ]
+    },
+    "train_val_split": 0.2,
+    "feature_scaler": "StandardScaler"
+}

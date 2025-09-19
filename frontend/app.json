@@ -4,10 +4,19 @@
     "slug": "ai-sportify",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": ["ios", "android", "web"],
-    "assetBundlePatterns": ["**/*"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "updates": {
       "enabled": false
+    },
+    "android": {
+      "package": "com.anonymous.aisportify"
     }
   }
 }

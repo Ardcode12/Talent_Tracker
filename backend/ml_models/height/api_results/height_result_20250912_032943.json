@@ -1,0 +1,24 @@
+{
+  "height_cm": 175.0,
+  "height_pixels": 925.0,
+  "height_ratio": 0.723,
+  "confidence": 0.975,
+  "landmarks_detected": true,
+  "head_top_y": 0.185,
+  "feet_bottom_y": 0.908,
+  "landmark_visibility": {
+    "nose": 1.0,
+    "ears": 1.0,
+    "ankles": 0.969,
+    "heels": 0.942
+  },
+  "timestamp": "2025-09-12T03:29:43.548157",
+  "image_filename": "WhatsApp Image 2025-09-12 at 03.29.15_728cbfa1.jpg",
+  "image_size": "720x1280",
+  "actual_height": null,
+  "processing_info": {
+    "mediapipe_version": "0.10.21",
+    "method": "pose_landmarks",
+    "model_complexity": 2
+  }
+}

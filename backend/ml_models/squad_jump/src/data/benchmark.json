@@ -1,0 +1,8 @@
+{
+    "ideal_knee_angle": 140.02777372064256,
+    "knee_tolerance": 14.002777372064257,
+    "ideal_hip_depth": 6.15782243013382,
+    "hip_tolerance": 0.615782243013382,
+    "ideal_squats_per_sec": 0.05537187985224937,
+    "squats_tolerance": 0.005537187985224937
+}

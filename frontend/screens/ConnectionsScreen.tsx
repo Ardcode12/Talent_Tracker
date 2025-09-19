@@ -1,5 +1,5 @@
 // app/(tabs)/connections.tsx
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -7,48 +7,44 @@ import {
   Text,
   Image,
   TouchableOpacity,
-  Animated,
   Dimensions,
   StatusBar,
   Platform,
+  TextInput,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
-  TextInput,
-  SectionList,
 } from 'react-native';
-import { Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
-import { ScrollAnimatedView } from '../components/ScrollAnimatedView';
-import { useScrollAnimations } from '../hooks/useScrollAnimations';
-// import { GlassmorphicCard } from '../../components/GlassmorphicCard';
-import { 
-  UltraGradientBackground,
-  FloatingParticles,
-  LiquidMorphAnimation,
-  PrismaticCard,
-  NeonGlowView
-} from '../components/UltraPremiumEffects';
-// import MaskedView from '@react-native-masked-view/masked-view';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const API_URL = 'http://localhost:8000/api'; // Update with your backend URL
 
 // Interfaces
 interface Connection {
   id: string;
   name: string;
   profilePhoto: string;
-  role: 'Athlete' | 'Coach' | 'Scout' | 'Organization';
+  role: string;
   sport: string;
   location: string;
+  bio?: string;
   isOnline: boolean;
   lastActive?: string;
   connections?: number;
   performance?: string;
-  bio?: string;
-  achievements?: string[];
   verified?: boolean;
+  age?: number;
+  experience?: number;
+  achievements?: string;
+  hasPendingRequest?: boolean;
+  requestStatus?: string;
 }
 
 interface ConnectionRequest {
@@ -67,822 +63,889 @@ interface Group {
   logo: string;
   memberCount: number;
   description: string;
-  type: 'Federation' | 'Academy' | 'Community';
+  type: string;
 }
 
-// Sample Data
-const SUGGESTED_CONNECTIONS: Connection[] = [
-  {
-    id: '1',
-    name: 'Rahul Verma',
-    profilePhoto: 'https://randomuser.me/api/portraits/men/1.jpg',
-    role: 'Athlete',
-    sport: 'Sprinter',
-    location: 'Mumbai',
-    isOnline: true,
-    connections: 342,
-    performance: '100m - 10.8s',
-    verified: true,
-  },
-  {
-    id: '2',
-    name: 'Priya Singh',
-    profilePhoto: 'https://randomuser.me/api/portraits/women/2.jpg',
-    role: 'Coach',
-    sport: 'Athletics',
-    location: 'Delhi',
-    isOnline: false,
-    lastActive: '2h ago',
-    connections: 567,
-    achievements: ['National Coach Award 2023', 'Trained 50+ athletes'],
-    verified: true,
-  },
-  {
-    id: '3',
-    name: 'Amit Kumar',
-    profilePhoto: 'https://randomuser.me/api/portraits/men/3.jpg',
-    role: 'Scout',
-    sport: 'Football',
-    location: 'Bangalore',
-    isOnline: true,
-    connections: 890,
-  },
-];
-
-const CONNECTION_REQUESTS: ConnectionRequest[] = [
-  {
-    id: 'r1',
-    name: 'Aman Gupta',
-    profilePhoto: 'https://randomuser.me/api/portraits/men/10.jpg',
-    sport: 'Football',
-    role: 'Athlete',
-    requestTime: '2h ago',
-    mutualConnections: 5,
-  },
-  {
-    id: 'r2',
-    name: 'Sara Khan',
-    profilePhoto: 'https://randomuser.me/api/portraits/women/11.jpg',
-    sport: 'Basketball',
-    role: 'Coach',
-    requestTime: '1d ago',
-    mutualConnections: 3,
-  },
-];
-
-const MY_CONNECTIONS: Connection[] = [
-  {
-    id: 'c1',
-    name: 'Neha Sharma',
-    profilePhoto: 'https://randomuser.me/api/portraits/women/20.jpg',
-    role: 'Athlete',
-    sport: 'Basketball',
-    location: 'Pune',
-    isOnline: true,
-    lastActive: 'Active now',
-  },
-  {
-    id: 'c2',
-    name: 'Karan Mehta',
-    profilePhoto: 'https://randomuser.me/api/portraits/men/21.jpg',
-    role: 'Athlete',
-    sport: 'Athletics',
-    location: 'Chennai',
-    isOnline: false,
-    lastActive: '1h ago',
-  },
-];
-
-const GROUPS: Group[] = [
-  {
-    id: 'g1',
-    name: 'Indian Athletics Federation',
-    logo: 'https://via.placeholder.com/100',
-    memberCount: 5420,
-    description: 'Official federation for athletics in India',
-    type: 'Federation',
-  },
-  {
-    id: 'g2',
-    name: 'Khelo India Academy',
-    logo: 'https://via.placeholder.com/100',
-    memberCount: 3200,
-    description: 'Government sports development program',
-    type: 'Academy',
-  },
-];
-
-const AI_RECOMMENDATIONS = [
-  {
-    id: 'ai1',
-    text: 'Coach specializes in sprint training, matches your sport',
-    icon: '🏃‍♂️',
-    connectionId: '2',
-  },
-  {
-    id: 'ai2',
-    text: '5 athletes from your city with similar performance stats',
-    icon: '📍',
-    count: 5,
-  },
-];
-
 export default function ConnectionsScreen() {
-  const { scrollY, handleScroll, createScrollAnimation } = useScrollAnimations();
-  const [selectedTab, setSelectedTab] = useState('all');
-  const [showFilterModal, setShowFilterModal] = useState(false);
+  // State
   const [searchText, setSearchText] = useState('');
-  const [pendingRequests, setPendingRequests] = useState(CONNECTION_REQUESTS);
-  const [myConnections, setMyConnections] = useState(MY_CONNECTIONS);
+  const [selectedTab, setSelectedTab] = useState('discover');
+  const [selectedRole, setSelectedRole] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Connection | null>(null);
+  const [showUserModal, setShowUserModal] = useState(false);
   
-  // Animations
-  const pulseAnimation = useRef(new Animated.Value(1)).current;
-  const shimmerAnimation = useRef(new Animated.Value(0)).current;
-  const networkAnimation = useRef(new Animated.Value(0)).current;
-  const waveAnimation = useRef(new Animated.Value(0)).current;
-  const glowAnimation = useRef(new Animated.Value(0)).current;
+  // Data states
+  const [pendingRequests, setPendingRequests] = useState<ConnectionRequest[]>([]);
+  const [myConnections, setMyConnections] = useState<Connection[]>([]);
+  const [availableConnections, setAvailableConnections] = useState<Connection[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    // Pulse animation for online indicators
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnimation, {
-          toValue: 1.2,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnimation, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Shimmer effect for cards
-    Animated.loop(
-      Animated.timing(shimmerAnimation, {
-        toValue: 1,
-        duration: 2000,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // Network animation
-    Animated.loop(
-      Animated.timing(networkAnimation, {
-        toValue: 1,
-        duration: 3000,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // Wave animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(waveAnimation, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(waveAnimation, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Glow animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnimation, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnimation, {
-          toValue: 0.3,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
-
-  const handleConnect = (connectionId: string) => {
-    // Handle connection logic
-  };
-
-  const handleAcceptRequest = (requestId: string) => {
-    const request = pendingRequests.find(r => r.id === requestId);
-    if (request) {
-      setPendingRequests(prev => prev.filter(r => r.id !== requestId));
-      // Add to connections logic
+  // Get auth token
+  const getAuthToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
     }
   };
 
-  const handleIgnoreRequest = (requestId: string) => {
-    setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+  // Fetch helper function
+  const fetchWithAuth = async (url: string, options: any = {}) => {
+    const token = await getAuthToken();
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
   };
 
-  // Render Header
-  const renderHeader = () => (
-    <>
-      <UltraGradientBackground />
-      <LiquidMorphAnimation />
-      <FloatingParticles />
+  // Fetch all data
+  const fetchData = async (resetPage = true) => {
+    try {
+      if (resetPage) {
+        setLoading(true);
+        setCurrentPage(1);
+      }
+
+      const [connectionsData, requestsData, groupsData] = await Promise.all([
+        fetchWithAuth(`${API_URL}/connections`),
+        fetchWithAuth(`${API_URL}/connections/requests`),
+        fetchWithAuth(`${API_URL}/connections/groups`),
+      ]);
+
+      setMyConnections(connectionsData.data || []);
+      setPendingRequests(requestsData.data || []);
+      setGroups(groupsData.data || []);
+
+      // Fetch available connections
+      await fetchAvailableConnections(1, true);
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      Alert.alert('Error', 'Failed to load connections');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Fetch available connections with filters
+  const fetchAvailableConnections = async (page = 1, reset = false) => {
+    try {
+      if (!reset && loadingMore) return;
       
-      <View style={styles.header}>
-        <ScrollAnimatedView animation="fadeIn" duration={1000}>
-          {/* Network Animation Background */}
-          <Animated.View style={[styles.networkBackground, {
-            opacity: networkAnimation.interpolate({
-              inputRange: [0, 0.5, 1],
-              outputRange: [0.3, 0.6, 0.3],
-            }),
-          }]}>
-            <NetworkLines />
-          </Animated.View>
+      setLoadingMore(true);
+      
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        ...(selectedRole !== 'all' && { role: selectedRole }),
+        ...(searchText && { search: searchText }),
+      });
 
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Connections</Text>
-            <Text style={styles.headerSubtitle}>Expand Your Network</Text>
-            
-            {/* Stats Row */}
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{myConnections.length}</Text>
-                <Text style={styles.statLabel}>Connections</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{pendingRequests.length}</Text>
-                <Text style={styles.statLabel}>Pending</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>12</Text>
-                <Text style={styles.statLabel}>Groups</Text>
-              </View>
-            </View>
-          </View>
-          
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <BlurView intensity={80} style={styles.searchBlur}>
-              <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search athletes, coaches, scouts..."
-                placeholderTextColor={Theme.colors.textSecondary}
-                value={searchText}
-                onChangeText={setSearchText}
-              />
-              <TouchableOpacity onPress={() => setShowFilterModal(true)}>
-                <Ionicons name="filter" size={20} color={Theme.colors.primary} />
-              </TouchableOpacity>
-            </BlurView>
-          </View>
-          
-          {/* Category Tabs */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryTabs}
-          >
-            {['All', 'Athletes', 'Coaches', 'Scouts', 'Organizations'].map((tab, index) => (
-              <ScrollAnimatedView
-                key={tab}
-                animation="slideInRight"
-                delay={index * 50}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.tabButton,
-                    selectedTab === tab.toLowerCase() && styles.tabButtonActive
-                  ]}
-                  onPress={() => setSelectedTab(tab.toLowerCase())}
-                >
-                  <Text style={[
-                    styles.tabButtonText,
-                    selectedTab === tab.toLowerCase() && styles.tabButtonTextActive
-                  ]}>{tab}</Text>
-                </TouchableOpacity>
-              </ScrollAnimatedView>
-            ))}
-          </ScrollView>
-        </ScrollAnimatedView>
-      </View>
-    </>
-  );
+      const response = await fetchWithAuth(`${API_URL}/connections/available?${params}`);
+      
+      if (reset) {
+        setAvailableConnections(response.data || []);
+      } else {
+        setAvailableConnections(prev => [...prev, ...(response.data || [])]);
+      }
+      
+      setCurrentPage(page);
+      setTotalPages(response.pagination?.pages || 1);
+      
+    } catch (error) {
+      console.error('Error fetching available connections:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
-  // Render Connection Requests Section
-  const renderConnectionRequests = () => {
-    if (pendingRequests.length === 0) return null;
+  // Send connection request
+  const handleConnect = async (connectionId: string) => {
+    try {
+      await fetchWithAuth(`${API_URL}/connections/request/${connectionId}`, {
+        method: 'POST',
+      });
+      
+      Alert.alert('Success', 'Connection request sent!');
+      
+      // Update the user's pending status in the list
+      setAvailableConnections(prev => 
+        prev.map(conn => 
+          conn.id === connectionId 
+            ? { ...conn, hasPendingRequest: true, requestStatus: 'pending' }
+            : conn
+        )
+      );
+      
+      // Close modal if open
+      setShowUserModal(false);
+    } catch (error) {
+      console.error('Error sending connection request:', error);
+      Alert.alert('Error', 'Failed to send connection request');
+    }
+  };
 
-    return (
-      <View style={styles.section}>
-        <ScrollAnimatedView animation="slideInLeft">
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Connection Requests</Text>
-            <View style={styles.requestBadge}>
-              <Text style={styles.requestBadgeText}>{pendingRequests.length}</Text>
-            </View>
-          </View>
-        </ScrollAnimatedView>
-        
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {pendingRequests.map((request, index) => (
-            <ScrollAnimatedView
-              key={request.id}
-              animation="fadeUp"
-              delay={index * 100}
-              style={styles.requestCard}
-            >
-              <PrismaticCard>
-                <View style={styles.requestContent}>
-                  {/* Animated Glow Background */}
-                  <Animated.View style={[styles.requestGlow, {
-                    opacity: glowAnimation,
-                  }]} />
-                  
-                  <Image source={{ uri: request.profilePhoto }} style={styles.requestPhoto} />
-                  <Text style={styles.requestName}>{request.name}</Text>
-                  <Text style={styles.requestRole}>{request.role} • {request.sport}</Text>
-                  
-                  {request.mutualConnections && (
-                    <View style={styles.mutualContainer}>
-                      <Ionicons name="people" size={14} color={Theme.colors.primary} />
-                      <Text style={styles.mutualText}>
-                        {request.mutualConnections} mutual connections
-                      </Text>
-                    </View>
-                  )}
-                  
-                  <View style={styles.requestActions}>
-                    <TouchableOpacity 
-                      style={styles.acceptButton}
-                      onPress={() => handleAcceptRequest(request.id)}
-                    >
-                      <Ionicons name="checkmark" size={18} color="#fff" />
-                      <Text style={styles.acceptButtonText}>Accept</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.ignoreButton}
-                      onPress={() => handleIgnoreRequest(request.id)}
-                    >
-                      <Text style={styles.ignoreButtonText}>Ignore</Text>
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <Text style={styles.requestTime}>{request.requestTime}</Text>
-                </View>
-              </PrismaticCard>
-            </ScrollAnimatedView>
-          ))}
-        </ScrollView>
-      </View>
+  // Other handler functions remain the same...
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      await fetchWithAuth(`${API_URL}/connections/accept/${requestId}`, {
+        method: 'POST',
+      });
+      
+      Alert.alert('Success', 'Connection request accepted!');
+      await fetchData();
+    } catch (error) {
+      console.error('Error accepting request:', error);
+      Alert.alert('Error', 'Failed to accept request');
+    }
+  };
+
+  const handleIgnoreRequest = async (requestId: string) => {
+    try {
+      await fetchWithAuth(`${API_URL}/connections/reject/${requestId}`, {
+        method: 'DELETE',
+      });
+      
+      setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+      Alert.alert('Success', 'Request ignored');
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      Alert.alert('Error', 'Failed to reject request');
+    }
+  };
+
+  const handleRemoveConnection = async (connectionId: string) => {
+    Alert.alert(
+      'Remove Connection',
+      'Are you sure you want to remove this connection?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await fetchWithAuth(`${API_URL}/connections/remove/${connectionId}`, {
+                method: 'DELETE',
+              });
+              
+              setMyConnections(prev => prev.filter(c => c.id !== connectionId));
+              Alert.alert('Success', 'Connection removed');
+            } catch (error) {
+              console.error('Error removing connection:', error);
+              Alert.alert('Error', 'Failed to remove connection');
+            }
+          },
+        },
+      ]
     );
   };
 
-  // Render Suggested Connections
-  const renderSuggestedConnections = () => (
-    <View style={styles.section}>
-      <ScrollAnimatedView animation="slideInLeft">
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Suggested Connections</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAllText}>See All</Text>
+  // Calculate time ago
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    // Refetch when search or role filter changes
+    const delayDebounce = setTimeout(() => {
+      if (selectedTab === 'discover') {
+        fetchAvailableConnections(1, true);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchText, selectedRole]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Theme.colors.primary} />
+      </View>
+    );
+  }
+
+  // Render Header
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <LinearGradient
+        colors={['rgba(20, 27, 45, 0.95)', 'rgba(20, 27, 45, 0.8)']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      
+      <View style={styles.headerContent}>
+        <Text style={styles.headerTitle}>Connections</Text>
+        <Text style={styles.headerSubtitle}>Build Your Sports Network</Text>
+        
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          <TouchableOpacity 
+            style={styles.statItem}
+            onPress={() => setSelectedTab('connections')}
+          >
+            <Text style={styles.statNumber}>{myConnections.length}</Text>
+            <Text style={styles.statLabel}>Connections</Text>
+          </TouchableOpacity>
+          <View style={styles.statDivider} />
+          <TouchableOpacity 
+            style={styles.statItem}
+            onPress={() => setSelectedTab('requests')}
+          >
+            <Text style={styles.statNumber}>{pendingRequests.length}</Text>
+            <Text style={styles.statLabel}>Pending</Text>
+          </TouchableOpacity>
+          <View style={styles.statDivider} />
+          <TouchableOpacity 
+            style={styles.statItem}
+            onPress={() => setSelectedTab('discover')}
+          >
+            <Text style={styles.statNumber}>{availableConnections.length}+</Text>
+            <Text style={styles.statLabel}>Discover</Text>
           </TouchableOpacity>
         </View>
-      </ScrollAnimatedView>
+      </View>
       
-      {SUGGESTED_CONNECTIONS.map((connection, index) => (
-        <ScrollAnimatedView
-          key={connection.id}
-          animation="slideInRight"
-          delay={index * 100}
-          style={styles.connectionCard}
-        >
-          <TouchableOpacity>
-            <View style={styles.connectionCardContent}>
-              {/* Shimmer Effect */}
-              <Animated.View
-                style={[
-                  styles.shimmerOverlay,
-                  {
-                    transform: [{
-                      translateX: shimmerAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-SCREEN_WIDTH, SCREEN_WIDTH],
-                      }),
-                    }],
-                  },
-                ]}
-              >
-                <LinearGradient
-                  colors={['transparent', 'rgba(255,255,255,0.1)', 'transparent']}
-                  style={styles.shimmerGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                />
-              </Animated.View>
-              
-              <View style={styles.connectionLeft}>
-                <View style={styles.profilePhotoContainer}>
-                  <Image source={{ uri: connection.profilePhoto }} style={styles.profilePhoto} />
-                  {connection.isOnline && (
-                    <Animated.View style={[styles.onlineIndicator, {
-                      transform: [{ scale: pulseAnimation }],
-                    }]} />
-                  )}
-                  {connection.verified && (
-                    <View style={styles.verifiedBadge}>
-                      <Ionicons name="checkmark" size={10} color="#fff" />
-                    </View>
-                  )}
-                </View>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <BlurView intensity={80} style={styles.searchBlur}>
+          <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by name, sport, or location..."
+            placeholderTextColor={Theme.colors.textSecondary}
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+        </BlurView>
+      </View>
+      
+      {/* Main Tabs */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.mainTabs}
+      >
+        {[
+          { id: 'discover', label: 'Discover', icon: 'compass' },
+          { id: 'connections', label: 'My Connections', icon: 'people' },
+          { id: 'requests', label: 'Requests', icon: 'person-add' },
+          { id: 'groups', label: 'Groups', icon: 'people-circle' },
+        ].map(tab => (
+          <TouchableOpacity
+            key={tab.id}
+            style={[
+              styles.mainTabButton,
+              selectedTab === tab.id && styles.mainTabButtonActive
+            ]}
+            onPress={() => setSelectedTab(tab.id)}
+          >
+            <Ionicons 
+              name={tab.icon as any} 
+              size={20} 
+              color={selectedTab === tab.id ? Theme.colors.text : Theme.colors.textSecondary} 
+            />
+            <Text style={[
+              styles.mainTabText,
+              selectedTab === tab.id && styles.mainTabTextActive
+            ]}>{tab.label}</Text>
+            {tab.id === 'requests' && pendingRequests.length > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{pendingRequests.length}</Text>
               </View>
-              
-              <View style={styles.connectionCenter}>
-                <Text style={styles.connectionName}>{connection.name}</Text>
-                <Text style={styles.connectionRole}>
-                  {connection.role} • {connection.sport}
-                </Text>
-                <View style={styles.connectionMeta}>
-                  <View style={styles.metaItem}>
-                    <Ionicons name="location" size={12} color={Theme.colors.textSecondary} />
-                    <Text style={styles.metaText}>{connection.location}</Text>
-                  </View>
-                  {connection.connections && (
-                    <View style={styles.metaItem}>
-                      <Ionicons name="people" size={12} color={Theme.colors.textSecondary} />
-                      <Text style={styles.metaText}>{connection.connections} connections</Text>
-                    </View>
-                  )}
-                </View>
-                {connection.performance && (
-                  <View style={styles.performanceBadge}>
-                    <Text style={styles.performanceText}>{connection.performance}</Text>
-                  </View>
-                )}
-              </View>
-              
-              <View style={styles.connectionRight}>
-                <TouchableOpacity 
-                  style={styles.connectButton}
-                  onPress={() => handleConnect(connection.id)}
-                >
-                  <Ionicons name="add" size={20} color={Theme.colors.primary} />
-                  <Text style={styles.connectButtonText}>Connect</Text>
-                </TouchableOpacity>
-                {connection.isOnline ? (
-                  <Text style={styles.statusText}>Active now</Text>
-                ) : (
-                  <Text style={styles.statusText}>{connection.lastActive}</Text>
-                )}
-              </View>
-            </View>
+            )}
           </TouchableOpacity>
-        </ScrollAnimatedView>
-      ))}
+        ))}
+      </ScrollView>
+      
+      {/* Role Filter (only for Discover tab) */}
+      {selectedTab === 'discover' && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.roleFilter}
+        >
+          {['All', 'Athletes', 'Coaches', 'Scouts'].map(role => (
+            <TouchableOpacity
+              key={role}
+              style={[
+                styles.roleButton,
+                selectedRole === role.toLowerCase() && styles.roleButtonActive
+              ]}
+              onPress={() => setSelectedRole(role.toLowerCase())}
+            >
+              <Text style={[
+                styles.roleButtonText,
+                selectedRole === role.toLowerCase() && styles.roleButtonTextActive
+              ]}>{role}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 
-  // Render AI Smart Recommendations
-  const renderAIRecommendations = () => (
-    <View style={styles.section}>
-      <ScrollAnimatedView animation="fadeIn">
-        <View style={styles.sectionHeader}>
-          <View style={styles.aiHeaderIcon}>
-            <MaterialCommunityIcons name="robot" size={24} color={Theme.colors.primary} />
+  // Render Discover Tab (All available athletes and coaches)
+  const renderDiscoverTab = () => {
+    const renderUserCard = ({ item }: { item: Connection }) => (
+      <TouchableOpacity
+        style={styles.discoverCard}
+        onPress={() => {
+          setSelectedUser(item);
+          setShowUserModal(true);
+        }}
+      >
+        <View style={styles.discoverCardContent}>
+          <View style={styles.discoverCardHeader}>
+            <View style={styles.profileSection}>
+              <Image 
+                source={{ uri: item.profilePhoto || 'https://via.placeholder.com/80' }} 
+                style={styles.discoverPhoto} 
+              />
+              {item.isOnline && <View style={styles.onlineIndicator} />}
+              {item.verified && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark" size={10} color="#fff" />
+                </View>
+              )}
+            </View>
+            
+            <View style={styles.discoverInfo}>
+              <Text style={styles.discoverName}>{item.name}</Text>
+              <View style={styles.roleTag}>
+                <Text style={styles.roleTagText}>{item.role}</Text>
+              </View>
+              <Text style={styles.discoverSport}>{item.sport}</Text>
+              
+              <View style={styles.discoverMeta}>
+                <View style={styles.metaItem}>
+                  <Ionicons name="location" size={12} color={Theme.colors.textSecondary} />
+                  <Text style={styles.metaText}>{item.location || 'Not specified'}</Text>
+                </View>
+                {item.experience && (
+                  <View style={styles.metaItem}>
+                    <Ionicons name="time" size={12} color={Theme.colors.textSecondary} />
+                    <Text style={styles.metaText}>{item.experience}y exp</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
-          <Text style={styles.sectionTitle}>AI Smart Recommendations</Text>
+          
+          {item.bio && (
+            <Text style={styles.discoverBio} numberOfLines={2}>
+              {item.bio}
+            </Text>
+          )}
+          
+          <View style={styles.discoverStats}>
+            {item.connections !== undefined && (
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{item.connections}</Text>
+                <Text style={styles.statLabel}>Connections</Text>
+              </View>
+            )}
+            {item.performance && (
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{item.performance.split(': ')[1]}</Text>
+                <Text style={styles.statLabel}>AI Score</Text>
+              </View>
+            )}
+            {item.age && (
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{item.age}</Text>
+                <Text style={styles.statLabel}>Age</Text>
+              </View>
+            )}
+          </View>
+          
+          <TouchableOpacity
+            style={[
+              styles.connectButton,
+              item.hasPendingRequest && styles.pendingButton
+            ]}
+            onPress={() => !item.hasPendingRequest && handleConnect(item.id)}
+            disabled={item.hasPendingRequest}
+          >
+            {item.hasPendingRequest ? (
+              <>
+                <Ionicons name="hourglass" size={18} color="#fff" />
+                <Text style={styles.connectButtonText}>Request Pending</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="person-add" size={18} color="#fff" />
+                <Text style={styles.connectButtonText}>Connect</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
-      </ScrollAnimatedView>
-      
-      {AI_RECOMMENDATIONS.map((rec, index) => (
-        <ScrollAnimatedView
-          key={rec.id}
-          animation="bounceIn"
-          delay={index * 150}
-        >
-          <TouchableOpacity style={styles.aiRecommendationCard}>
-            <LinearGradient
-              colors={[Theme.colors.primary + '10', Theme.colors.secondary + '10']}
-              style={StyleSheet.absoluteFillObject}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+      </TouchableOpacity>
+    );
+
+    return (
+      <FlatList
+        data={availableConnections}
+        renderItem={renderUserCard}
+        keyExtractor={item => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.discoverRow}
+        contentContainerStyle={styles.discoverContent}
+        onEndReached={() => {
+          if (currentPage < totalPages && !loadingMore) {
+            fetchAvailableConnections(currentPage + 1);
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color={Theme.colors.primary} />
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="people-outline" size={64} color={Theme.colors.textSecondary} />
+            <Text style={styles.emptyStateTitle}>No users found</Text>
+            <Text style={styles.emptyStateText}>
+              Try adjusting your filters or search terms
+            </Text>
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchData();
+            }}
+            tintColor={Theme.colors.primary}
+          />
+        }
+      />
+    );
+  };
+
+  // Render Connection Requests Tab
+  const renderRequestsTab = () => {
+    if (pendingRequests.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="person-add-outline" size={64} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyStateTitle}>No pending requests</Text>
+          <Text style={styles.emptyStateText}>
+            When someone sends you a connection request, it will appear here
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView style={styles.scrollContent}>
+        {pendingRequests.map(request => (
+          <View key={request.id} style={styles.requestFullCard}>
+            <Image 
+              source={{ uri: request.profilePhoto || 'https://via.placeholder.com/60' }} 
+              style={styles.requestFullPhoto} 
             />
             
-            <View style={styles.aiCardContent}>
-              <Text style={styles.aiIcon}>{rec.icon}</Text>
-              <View style={styles.aiTextContent}>
-                <Text style={styles.aiRecommendationText}>{rec.text}</Text>
-                {rec.count && (
-                  <View style={styles.aiCountBadge}>
-                    <Text style={styles.aiCountText}>{rec.count} matches</Text>
-                  </View>
-                )}
-              </View>
-              <TouchableOpacity style={styles.aiActionButton}>
-                <Text style={styles.aiActionText}>View All</Text>
-                <Ionicons name="arrow-forward" size={16} color={Theme.colors.primary} />
+            <View style={styles.requestFullInfo}>
+              <Text style={styles.requestFullName}>{request.name}</Text>
+              <Text style={styles.requestFullRole}>{request.role} • {request.sport}</Text>
+              
+              {request.mutualConnections > 0 && (
+                <View style={styles.mutualContainer}>
+                  <Ionicons name="people" size={14} color={Theme.colors.primary} />
+                  <Text style={styles.mutualText}>
+                    {request.mutualConnections} mutual connections
+                  </Text>
+                </View>
+              )}
+              
+              <Text style={styles.requestTime}>{getTimeAgo(request.requestTime)}</Text>
+            </View>
+            
+            <View style={styles.requestFullActions}>
+              <TouchableOpacity 
+                style={styles.acceptButton}
+                onPress={() => handleAcceptRequest(request.id)}
+              >
+                <Ionicons name="checkmark" size={18} color="#fff" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.rejectButton}
+                onPress={() => handleIgnoreRequest(request.id)}
+              >
+                <Ionicons name="close" size={18} color={Theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </ScrollAnimatedView>
-      ))}
-    </View>
-  );
+          </View>
+        ))}
+      </ScrollView>
+    );
+  };
 
-  // Render My Connections
-  const renderMyConnections = () => (
-    <View style={styles.section}>
-      <ScrollAnimatedView animation="slideInLeft">
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>My Connections</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAllText}>View All ({myConnections.length})</Text>
-          </TouchableOpacity>
+  // Render My Connections Tab
+  const renderConnectionsTab = () => {
+    const filteredConnections = myConnections.filter(c => 
+      !searchText || 
+      c.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      c.sport?.toLowerCase().includes(searchText.toLowerCase()) ||
+      c.location?.toLowerCase().includes(searchText.toLowerCase())
+    );
+
+    if (filteredConnections.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="people-outline" size={64} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyStateTitle}>
+            {searchText ? 'No connections found' : 'No connections yet'}
+          </Text>
+          <Text style={styles.emptyStateText}>
+            {searchText 
+              ? `No connections matching "${searchText}"`
+              : 'Start building your network by connecting with athletes and coaches'
+            }
+          </Text>
+          {!searchText && (
+            <TouchableOpacity 
+              style={styles.discoverButton}
+              onPress={() => setSelectedTab('discover')}
+            >
+              <Text style={styles.discoverButtonText}>Discover People</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      </ScrollAnimatedView>
-      
-      {myConnections.slice(0, 3).map((connection, index) => (
-        <ScrollAnimatedView
-          key={connection.id}
-          animation="fadeUp"
-          delay={index * 100}
-        >
-          <TouchableOpacity style={styles.myConnectionCard}>
-            <View style={styles.myConnectionContent}>
-              <View style={styles.myConnectionLeft}>
-                <Image source={{ uri: connection.profilePhoto }} style={styles.myConnectionPhoto} />
+      );
+    }
+
+    return (
+      <ScrollView style={styles.scrollContent}>
+        {filteredConnections.map(connection => (
+          <TouchableOpacity 
+            key={connection.id} 
+            style={styles.connectionFullCard}
+            onPress={() => {
+              setSelectedUser(connection);
+              setShowUserModal(true);
+            }}
+          >
+            <View style={styles.connectionFullContent}>
+              <View style={styles.connectionFullLeft}>
+                <Image 
+                  source={{ uri: connection.profilePhoto || 'https://via.placeholder.com/60' }} 
+                  style={styles.connectionFullPhoto} 
+                />
                 <View style={[styles.statusIndicator, {
                   backgroundColor: connection.isOnline ? Theme.colors.success : Theme.colors.textSecondary,
                 }]} />
               </View>
               
-              <View style={styles.myConnectionInfo}>
-                <Text style={styles.myConnectionName}>{connection.name}</Text>
-                <Text style={styles.myConnectionRole}>{connection.sport}</Text>
-                <Text style={styles.myConnectionStatus}>
-                  {connection.isOnline ? 'Active now' : connection.lastActive}
+              <View style={styles.connectionFullInfo}>
+                <Text style={styles.connectionFullName}>{connection.name}</Text>
+                <Text style={styles.connectionFullRole}>
+                  {connection.role} • {connection.sport}
+                </Text>
+                <Text style={styles.connectionFullStatus}>
+                  {connection.isOnline ? 'Active now' : connection.lastActive ? getTimeAgo(connection.lastActive) : 'Offline'}
                 </Text>
               </View>
               
-              <View style={styles.myConnectionActions}>
+              <View style={styles.connectionFullActions}>
                 <TouchableOpacity style={styles.messageButton}>
                   <Ionicons name="chatbubble" size={20} color={Theme.colors.primary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.profileButton}>
-                  <Ionicons name="person" size={20} color={Theme.colors.textSecondary} />
+                <TouchableOpacity 
+                  style={styles.moreButton}
+                  onPress={() => handleRemoveConnection(connection.id)}
+                >
+                  <Ionicons name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             </View>
           </TouchableOpacity>
-        </ScrollAnimatedView>
-      ))}
-    </View>
-  );
-
-  // Render Popular Profiles (Leaderboard)
-  const renderPopularProfiles = () => (
-    <View style={styles.section}>
-      <ScrollAnimatedView animation="fadeIn">
-        <Text style={styles.sectionTitle}>Popular Profiles</Text>
-      </ScrollAnimatedView>
-      
-      <View style={styles.leaderboardContainer}>
-        <ScrollAnimatedView animation="slideInLeft" delay={100}>
-          <TouchableOpacity style={styles.leaderboardCard}>
-            <LinearGradient
-              colors={[Theme.colors.accent + '20', Theme.colors.accent + '10']}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <Text style={styles.leaderboardEmoji}>🏆</Text>
-            <View style={styles.leaderboardContent}>
-              <Text style={styles.leaderboardTitle}>Top Connected Athlete</Text>
-              <Text style={styles.leaderboardName}>Rahul Verma</Text>
-              <Text style={styles.leaderboardSport}>Sprinter • 1.2k connections</Text>
-            </View>
-          </TouchableOpacity>
-        </ScrollAnimatedView>
-        
-        <ScrollAnimatedView animation="slideInRight" delay={200}>
-          <TouchableOpacity style={styles.leaderboardCard}>
-            <LinearGradient
-              colors={[Theme.colors.primary + '20', Theme.colors.primary + '10']}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <Text style={styles.leaderboardEmoji}>⚡</Text>
-            <View style={styles.leaderboardContent}>
-              <Text style={styles.leaderboardTitle}>Trending Coach</Text>
-              <Text style={styles.leaderboardName}>Priya Singh</Text>
-              <Text style={styles.leaderboardSport}>Athletics • 890 connections</Text>
-            </View>
-          </TouchableOpacity>
-        </ScrollAnimatedView>
-      </View>
-    </View>
-  );
-
-  // Render Groups Section
-  const renderGroups = () => (
-    <View style={styles.section}>
-      <ScrollAnimatedView animation="slideInLeft">
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Join Groups & Academies</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAllText}>Explore</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollAnimatedView>
-      
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {GROUPS.map((group, index) => (
-          <ScrollAnimatedView
-            key={group.id}
-            animation="zoomIn"
-            delay={index * 100}
-            style={styles.groupCard}
-          >
-            <NeonGlowView color={Theme.colors.primary}>
-              <TouchableOpacity style={styles.groupContent}>
-                <Image source={{ uri: group.logo }} style={styles.groupLogo} />
-                <Text style={styles.groupName}>{group.name}</Text>
-                <Text style={styles.groupType}>{group.type}</Text>
-                <Text style={styles.groupDescription} numberOfLines={2}>
-                  {group.description}
-                </Text>
-                
-                <View style={styles.groupStats}>
-                  <Ionicons name="people" size={16} color={Theme.colors.textSecondary} />
-                  <Text style={styles.groupMemberCount}>{group.memberCount} members</Text>
-                </View>
-                
-                <TouchableOpacity style={styles.joinGroupButton}>
-                  <Text style={styles.joinGroupText}>Request to Join</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            </NeonGlowView>
-          </ScrollAnimatedView>
         ))}
       </ScrollView>
-    </View>
-  );
+    );
+  };
 
-  // Render Notifications Banner
-  const renderNotificationsBanner = () => (
-    <ScrollAnimatedView animation="bounceIn" delay={300}>
-      <TouchableOpacity style={styles.notificationBanner}>
-        <LinearGradient
-          colors={[Theme.colors.primary, Theme.colors.secondary]}
-          style={StyleSheet.absoluteFillObject}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        />
-        
-        {/* Animated Wave Effect */}
-        <Animated.View style={[styles.waveEffect, {
-          opacity: waveAnimation.interpolate({
-            inputRange: [0, 0.5, 1],
-            outputRange: [0, 0.3, 0],
-          }),
-          transform: [{
-            scale: waveAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [1, 2],
-            }),
-          }],
-        }]} />
-        
-        <View style={styles.notificationContent}>
-          <View style={styles.notificationIcon}>
-            <Ionicons name="notifications" size={20} color="#fff" />
-          </View>
-          <View style={styles.notificationText}>
-            <Text style={styles.notificationTitle}>5 New Coaches joined your network</Text>
-            <Text style={styles.notificationSubtitle}>2 Pending Requests waiting for approval</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
+  // Render Groups Tab
+  const renderGroupsTab = () => {
+    if (groups.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="people-circle-outline" size={64} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyStateTitle}>No groups available</Text>
+          <Text style={styles.emptyStateText}>
+            Groups and academies will appear here when available
+          </Text>
         </View>
-      </TouchableOpacity>
-    </ScrollAnimatedView>
-  );
+      );
+    }
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Theme.colors.background} />
-      
-      {renderHeader()}
-      
-      <Animated.ScrollView
-        style={styles.scrollView}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-      >
-        {renderNotificationsBanner()}
-        {renderConnectionRequests()}
-        {renderAIRecommendations()}
-        {renderSuggestedConnections()}
-        {renderPopularProfiles()}
-        {renderMyConnections()}
-        {renderGroups()}
-        
-        <View style={styles.bottomSpacing} />
-      </Animated.ScrollView>
-      
-      {/* Filter Modal */}
+    return (
+      <ScrollView style={styles.scrollContent}>
+        <View style={styles.groupsGrid}>
+          {groups.map(group => (
+            <TouchableOpacity key={group.id} style={styles.groupFullCard}>
+              <Image 
+                source={{ uri: group.logo || 'https://via.placeholder.com/100' }} 
+                style={styles.groupFullLogo} 
+              />
+              <Text style={styles.groupFullName}>{group.name}</Text>
+              <Text style={styles.groupFullType}>{group.type}</Text>
+              <Text style={styles.groupFullDescription} numberOfLines={2}>
+                {group.description}
+              </Text>
+              
+              <View style={styles.groupFullStats}>
+                <Ionicons name="people" size={16} color={Theme.colors.textSecondary} />
+                <Text style={styles.groupFullMembers}>{group.memberCount} members</Text>
+              </View>
+              
+              <TouchableOpacity style={styles.joinGroupButton}>
+                <Text style={styles.joinGroupText}>Request to Join</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  // User Profile Modal
+  const renderUserModal = () => {
+    if (!selectedUser) return null;
+
+    return (
       <Modal
-        visible={showFilterModal}
+        visible={showUserModal}
         animationType="slide"
         transparent
-        onRequestClose={() => setShowFilterModal(false)}
+        onRequestClose={() => setShowUserModal(false)}
       >
-        <View style={styles.modalContainer}>
+        <View style={styles.modalOverlay}>
           <TouchableOpacity 
-            style={styles.modalOverlay} 
-            onPress={() => setShowFilterModal(false)}
+            style={styles.modalBackground}
+            activeOpacity={1}
+            onPress={() => setShowUserModal(false)}
           />
-          <View style={styles.filterModalContent}>
-            <BlurView intensity={100} style={StyleSheet.absoluteFillObject} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter Connections</Text>
-              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <Ionicons name="close" size={24} color={Theme.colors.text} />
-              </TouchableOpacity>
-            </View>
-            {/* Add filter options here */}
+          
+          <View style={styles.modalContent}>
+            <ScrollView>
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setShowUserModal(false)}
+                >
+                  <Ionicons name="close" size={24} color={Theme.colors.text} />
+                </TouchableOpacity>
+                
+                <Image 
+                  source={{ uri: selectedUser.profilePhoto || 'https://via.placeholder.com/120' }}
+                  style={styles.modalProfilePhoto}
+                />
+                
+                {selectedUser.verified && (
+                  <View style={styles.modalVerifiedBadge}>
+                    <Ionicons name="checkmark-circle" size={24} color={Theme.colors.primary} />
+                  </View>
+                )}
+                
+                <Text style={styles.modalName}>{selectedUser.name}</Text>
+                <Text style={styles.modalRole}>{selectedUser.role} • {selectedUser.sport}</Text>
+                
+                {selectedUser.isOnline && (
+                  <View style={styles.modalOnlineStatus}>
+                    <View style={styles.modalOnlineDot} />
+                    <Text style={styles.modalOnlineText}>Active now</Text>
+                  </View>
+                )}
+              </View>
+              
+              {/* Modal Body */}
+              <View style={styles.modalBody}>
+                {/* Bio */}
+                {selectedUser.bio && (
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>About</Text>
+                    <Text style={styles.modalBio}>{selectedUser.bio}</Text>
+                  </View>
+                )}
+                
+                {/* Details */}
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Details</Text>
+                  <View style={styles.modalDetails}>
+                    {selectedUser.location && (
+                      <View style={styles.modalDetailItem}>
+                        <Ionicons name="location" size={16} color={Theme.colors.textSecondary} />
+                        <Text style={styles.modalDetailText}>{selectedUser.location}</Text>
+                      </View>
+                    )}
+                    {selectedUser.age && (
+                      <View style={styles.modalDetailItem}>
+                        <Ionicons name="calendar" size={16} color={Theme.colors.textSecondary} />
+                        <Text style={styles.modalDetailText}>{selectedUser.age} years old</Text>
+                      </View>
+                    )}
+                    {selectedUser.experience && (
+                      <View style={styles.modalDetailItem}>
+                        <Ionicons name="time" size={16} color={Theme.colors.textSecondary} />
+                        <Text style={styles.modalDetailText}>{selectedUser.experience} years experience</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                
+                {/* Achievements */}
+                {selectedUser.achievements && (
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Achievements</Text>
+                    <Text style={styles.modalAchievements}>{selectedUser.achievements}</Text>
+                  </View>
+                )}
+                
+                {/* Stats */}
+                <View style={styles.modalStats}>
+                  {selectedUser.connections !== undefined && (
+                    <View style={styles.modalStatBox}>
+                      <Text style={styles.modalStatValue}>{selectedUser.connections}</Text>
+                      <Text style={styles.modalStatLabel}>Connections</Text>
+                    </View>
+                  )}
+                  {selectedUser.performance && (
+                    <View style={styles.modalStatBox}>
+                      <Text style={styles.modalStatValue}>
+                        {selectedUser.performance.split(': ')[1]}
+                      </Text>
+                      <Text style={styles.modalStatLabel}>AI Score</Text>
+                    </View>
+                  )}
+                </View>
+                
+                {/* Action Button */}
+                {!myConnections.find(c => c.id === selectedUser.id) && (
+                  <TouchableOpacity
+                    style={[
+                      styles.modalConnectButton,
+                      selectedUser.hasPendingRequest && styles.pendingButton
+                    ]}
+                    onPress={() => !selectedUser.hasPendingRequest && handleConnect(selectedUser.id)}
+                    disabled={selectedUser.hasPendingRequest}
+                  >
+                    {selectedUser.hasPendingRequest ? (
+                      <>
+                        <Ionicons name="hourglass" size={20} color="#fff" />
+                        <Text style={styles.modalConnectText}>Request Pending</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Ionicons name="person-add" size={20} color="#fff" />
+                        <Text style={styles.modalConnectText}>Send Connection Request</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
+    );
+  };
+
+  // Main render based on selected tab
+  const renderContent = () => {
+    switch (selectedTab) {
+      case 'discover':
+        return renderDiscoverTab();
+      case 'connections':
+        return renderConnectionsTab();
+      case 'requests':
+        return renderRequestsTab();
+      case 'groups':
+        return renderGroupsTab();
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {renderHeader()}
+      {renderContent()}
+      {renderUserModal()}
     </View>
   );
 }
-
-// Network Lines Component
-const NetworkLines = () => (
-  <View style={StyleSheet.absoluteFillObject}>
-    {Array.from({ length: 5 }).map((_, i) => (
-      <View
-        key={i}
-        style={[
-          styles.networkLine,
-          {
-            top: `${20 * i}%`,
-            transform: [{ rotate: `${45 + i * 15}deg` }],
-          },
-        ]}
-      />
-    ))}
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Theme.colors.background,
   },
-  scrollView: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.background,
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: Theme.spacing.md,
     backgroundColor: 'rgba(20, 27, 45, 0.95)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  networkBackground: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.3,
-  },
-  networkLine: {
-    position: 'absolute',
-    width: 200,
-    height: 1,
-    backgroundColor: Theme.colors.primary,
-    opacity: 0.2,
   },
   headerContent: {
     paddingHorizontal: Theme.spacing.md,
     marginBottom: Theme.spacing.md,
-    zIndex: 1,
   },
+  // ... continuing from styles
+
   headerTitle: {
     fontSize: 32,
     fontWeight: '900',
     color: Theme.colors.text,
     marginBottom: 4,
-    textShadowColor: Theme.colors.primary,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
   },
   headerSubtitle: {
     fontSize: 16,
@@ -900,6 +963,7 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
   },
   statNumber: {
     fontSize: 24,
@@ -921,7 +985,6 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.md,
     borderRadius: Theme.borderRadius.full,
     overflow: 'hidden',
-    zIndex: 1,
   },
   searchBlur: {
     flexDirection: 'row',
@@ -936,11 +999,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Theme.colors.text,
   },
-  categoryTabs: {
+  mainTabs: {
     paddingHorizontal: Theme.spacing.md,
-    zIndex: 1,
+    marginBottom: Theme.spacing.sm,
   },
-  tabButton: {
+  mainTabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Theme.spacing.lg,
     paddingVertical: Theme.spacing.sm,
     borderRadius: Theme.borderRadius.full,
@@ -948,333 +1013,293 @@ const styles = StyleSheet.create({
     marginRight: Theme.spacing.sm,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    gap: 6,
   },
-  tabButtonActive: {
+  mainTabButtonActive: {
     backgroundColor: Theme.colors.primary,
     borderColor: Theme.colors.primary,
   },
-  tabButtonText: {
+  mainTabText: {
     fontSize: 14,
     fontWeight: '600',
     color: Theme.colors.textSecondary,
   },
-  tabButtonTextActive: {
+  mainTabTextActive: {
     color: Theme.colors.text,
   },
-  section: {
-    marginTop: Theme.spacing.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: Theme.spacing.md,
-    marginBottom: Theme.spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: Theme.colors.text,
-  },
-  seeAllText: {
-    fontSize: 16,
-    color: Theme.colors.primary,
-    fontWeight: '600',
-  },
-  requestBadge: {
+  tabBadge: {
     backgroundColor: Theme.colors.error,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: Theme.spacing.sm,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 4,
   },
-  requestBadgeText: {
+  tabBadgeText: {
     color: Theme.colors.text,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
   },
-  requestCard: {
-    width: 200,
-    marginLeft: Theme.spacing.md,
+  roleFilter: {
+    paddingHorizontal: Theme.spacing.md,
+    paddingBottom: Theme.spacing.md,
+  },
+  roleButton: {
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.xs,
+    borderRadius: Theme.borderRadius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginRight: Theme.spacing.sm,
   },
-  requestContent: {
-    alignItems: 'center',
-    padding: Theme.spacing.lg,
-    position: 'relative',
-    overflow: 'hidden',
+  roleButtonActive: {
+    backgroundColor: Theme.colors.secondary,
   },
-  requestGlow: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Theme.colors.primary,
-    top: -50,
-    right: -50,
-  },
-  requestPhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: Theme.spacing.md,
-    borderWidth: 3,
-    borderColor: Theme.colors.primary,
-  },
-  requestName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Theme.colors.text,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  requestRole: {
-    fontSize: 14,
-    color: Theme.colors.textSecondary,
-    marginBottom: Theme.spacing.sm,
-    textAlign: 'center',
-  },
-  mutualContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: Theme.spacing.md,
-  },
-  mutualText: {
+  roleButtonText: {
     fontSize: 12,
-    color: Theme.colors.primary,
-  },
-  requestActions: {
-    flexDirection: 'row',
-    gap: Theme.spacing.sm,
-    marginBottom: Theme.spacing.sm,
-  },
-  acceptButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Theme.colors.success,
-    paddingHorizontal: Theme.spacing.md,
-    paddingVertical: Theme.spacing.sm,
-    borderRadius: Theme.borderRadius.full,
-    gap: 4,
-  },
-  acceptButtonText: {
-    color: Theme.colors.text,
-    fontSize: 14,
     fontWeight: '600',
-  },
-  ignoreButton: {
-    paddingHorizontal: Theme.spacing.md,
-    paddingVertical: Theme.spacing.sm,
-    borderRadius: Theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  ignoreButtonText: {
-    color: Theme.colors.textSecondary,
-    fontSize: 14,
-        fontWeight: '600',
-  },
-  requestTime: {
-    fontSize: 12,
     color: Theme.colors.textSecondary,
   },
-  connectionCard: {
-    marginHorizontal: Theme.spacing.md,
-    marginBottom: Theme.spacing.md,
+  roleButtonTextActive: {
+    color: Theme.colors.text,
+  },
+
+  // Discover Tab Styles
+  discoverContent: {
+    paddingHorizontal: Theme.spacing.sm,
+    paddingTop: Theme.spacing.md,
+    paddingBottom: 100,
+  },
+  discoverRow: {
+    justifyContent: 'space-between',
+  },
+  discoverCard: {
+    flex: 0.48,
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: Theme.borderRadius.lg,
-    overflow: 'hidden',
+    marginBottom: Theme.spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  connectionCardContent: {
+  discoverCardContent: {
+    padding: Theme.spacing.md,
+  },
+  discoverCardHeader: {
     flexDirection: 'row',
-    padding: Theme.spacing.lg,
+    marginBottom: Theme.spacing.sm,
+  },
+  profileSection: {
     position: 'relative',
+    marginRight: Theme.spacing.sm,
   },
-  shimmerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '200%',
-  },
-  shimmerGradient: {
-    flex: 1,
-  },
-  connectionLeft: {
-    marginRight: Theme.spacing.md,
-  },
-  profilePhotoContainer: {
-    position: 'relative',
-  },
-  profilePhoto: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  discoverPhoto: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderWidth: 2,
-    borderColor: Theme.colors.primary,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   onlineIndicator: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: Theme.colors.success,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: Theme.colors.background,
   },
   verifiedBadge: {
     position: 'absolute',
     top: -2,
     right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: Theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  connectionCenter: {
+  discoverInfo: {
     flex: 1,
   },
-  connectionName: {
-    fontSize: 18,
+  discoverName: {
+    fontSize: 16,
     fontWeight: '700',
     color: Theme.colors.text,
+    marginBottom: 2,
+  },
+  roleTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: Theme.colors.primary + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
     marginBottom: 4,
   },
-  connectionRole: {
-    fontSize: 14,
-    color: Theme.colors.textSecondary,
-    marginBottom: Theme.spacing.sm,
+  roleTagText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Theme.colors.primary,
   },
-  connectionMeta: {
+  discoverSport: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    marginBottom: 4,
+  },
+  discoverMeta: {
     flexDirection: 'row',
-    gap: Theme.spacing.md,
-    marginBottom: Theme.spacing.sm,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 10,
     color: Theme.colors.textSecondary,
   },
-  performanceBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Theme.colors.primary + '20',
-    paddingHorizontal: Theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: Theme.borderRadius.sm,
-  },
-  performanceText: {
+  discoverBio: {
     fontSize: 12,
-    color: Theme.colors.primary,
-    fontWeight: '600',
+    color: Theme.colors.textSecondary,
+    marginBottom: Theme.spacing.sm,
+    lineHeight: 16,
   },
-  connectionRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+  discoverStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  statBox: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Theme.colors.text,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
   },
   connectButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
     backgroundColor: Theme.colors.primary,
-    paddingHorizontal: Theme.spacing.md,
     paddingVertical: Theme.spacing.sm,
-    borderRadius: Theme.borderRadius.full,
+    borderRadius: Theme.borderRadius.md,
+    gap: 6,
+  },
+  pendingButton: {
+    backgroundColor: Theme.colors.secondary,
   },
   connectButtonText: {
     color: Theme.colors.text,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-  statusText: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-  },
-  aiHeaderIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Theme.colors.primary + '20',
-    justifyContent: 'center',
+  loadingMore: {
+    paddingVertical: Theme.spacing.lg,
     alignItems: 'center',
-    marginRight: Theme.spacing.sm,
   },
-  aiRecommendationCard: {
-    marginHorizontal: Theme.spacing.md,
-    marginBottom: Theme.spacing.md,
-    borderRadius: Theme.borderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Theme.colors.primary + '30',
-  },
-  aiCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Theme.spacing.lg,
-  },
-  aiIcon: {
-    fontSize: 32,
-    marginRight: Theme.spacing.md,
-  },
-  aiTextContent: {
+
+  // Requests Tab Styles
+  scrollContent: {
     flex: 1,
+    padding: Theme.spacing.md,
   },
-  aiRecommendationText: {
-    fontSize: 16,
-    color: Theme.colors.text,
-    lineHeight: 22,
-  },
-  aiCountBadge: {
-    marginTop: 4,
-    alignSelf: 'flex-start',
-  },
-  aiCountText: {
-    fontSize: 14,
-    color: Theme.colors.primary,
-    fontWeight: '600',
-  },
-  aiActionButton: {
+  requestFullCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  aiActionText: {
-    fontSize: 14,
-    color: Theme.colors.primary,
-    fontWeight: '600',
-  },
-  myConnectionCard: {
-    marginHorizontal: Theme.spacing.md,
-    marginBottom: Theme.spacing.sm,
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: Theme.borderRadius.lg,
+    padding: Theme.spacing.md,
+    marginBottom: Theme.spacing.sm,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  myConnectionContent: {
+  requestFullPhoto: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: Theme.spacing.md,
+  },
+  requestFullInfo: {
+    flex: 1,
+  },
+  requestFullName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Theme.colors.text,
+    marginBottom: 2,
+  },
+  requestFullRole: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    marginBottom: 4,
+  },
+  mutualContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  mutualText: {
+    fontSize: 12,
+    color: Theme.colors.primary,
+  },
+  requestTime: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+  },
+  requestFullActions: {
+    flexDirection: 'row',
+    gap: Theme.spacing.sm,
+  },
+  acceptButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Theme.colors.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rejectButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Connections Tab Styles
+  connectionFullCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: Theme.borderRadius.lg,
+    marginBottom: Theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  connectionFullContent: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Theme.spacing.md,
   },
-  myConnectionLeft: {
+  connectionFullLeft: {
     position: 'relative',
     marginRight: Theme.spacing.md,
   },
-  myConnectionPhoto: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  connectionFullPhoto: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
   statusIndicator: {
     position: 'absolute',
@@ -1286,209 +1311,276 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: Theme.colors.background,
   },
-  myConnectionInfo: {
+  connectionFullInfo: {
     flex: 1,
   },
-  myConnectionName: {
+  connectionFullName: {
     fontSize: 16,
     fontWeight: '700',
     color: Theme.colors.text,
     marginBottom: 2,
   },
-  myConnectionRole: {
+  connectionFullRole: {
     fontSize: 14,
     color: Theme.colors.textSecondary,
     marginBottom: 2,
   },
-  myConnectionStatus: {
+  connectionFullStatus: {
     fontSize: 12,
     color: Theme.colors.textSecondary,
   },
-  myConnectionActions: {
+  connectionFullActions: {
     flexDirection: 'row',
     gap: Theme.spacing.sm,
   },
   messageButton: {
-    padding: 8,
+    padding: 10,
     borderRadius: Theme.borderRadius.md,
     backgroundColor: Theme.colors.primary + '20',
   },
-  profileButton: {
-    padding: 8,
+  moreButton: {
+    padding: 10,
     borderRadius: Theme.borderRadius.md,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
-  leaderboardContainer: {
-    paddingHorizontal: Theme.spacing.md,
-    gap: Theme.spacing.md,
+  discoverButton: {
+    marginTop: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing.xl,
+    paddingVertical: Theme.spacing.md,
+    backgroundColor: Theme.colors.primary,
+    borderRadius: Theme.borderRadius.full,
   },
-  leaderboardCard: {
+  discoverButtonText: {
+    color: Theme.colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  // Groups Tab Styles
+  groupsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  groupFullCard: {
+    width: '48%',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: Theme.borderRadius.lg,
     padding: Theme.spacing.lg,
     marginBottom: Theme.spacing.md,
-    position: 'relative',
-    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  leaderboardEmoji: {
-    fontSize: 48,
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-    marginTop: -24,
-    opacity: 0.3,
-  },
-  leaderboardContent: {
-    zIndex: 1,
-  },
-  leaderboardTitle: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  leaderboardName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Theme.colors.text,
-    marginBottom: 2,
-  },
-  leaderboardSport: {
-    fontSize: 14,
-    color: Theme.colors.textSecondary,
-  },
-  groupCard: {
-    width: 220,
-    marginLeft: Theme.spacing.md,
-    marginRight: Theme.spacing.sm,
-  },
-  groupContent: {
-    padding: Theme.spacing.lg,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
   },
-  groupLogo: {
+  groupFullLogo: {
     width: 80,
     height: 80,
     borderRadius: 40,
     marginBottom: Theme.spacing.md,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  groupName: {
-    fontSize: 18,
+  groupFullName: {
+    fontSize: 16,
     fontWeight: '700',
     color: Theme.colors.text,
     marginBottom: 4,
     textAlign: 'center',
   },
-  groupType: {
+  groupFullType: {
     fontSize: 12,
     color: Theme.colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: Theme.spacing.sm,
   },
-  groupDescription: {
-    fontSize: 14,
+  groupFullDescription: {
+    fontSize: 12,
     color: Theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: Theme.spacing.md,
   },
-  groupStats: {
+  groupFullStats: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginBottom: Theme.spacing.md,
   },
-  groupMemberCount: {
-    fontSize: 14,
+  groupFullMembers: {
+    fontSize: 12,
     color: Theme.colors.textSecondary,
   },
   joinGroupButton: {
-    paddingHorizontal: Theme.spacing.xl,
+    paddingHorizontal: Theme.spacing.lg,
     paddingVertical: Theme.spacing.sm,
     backgroundColor: Theme.colors.primary,
     borderRadius: Theme.borderRadius.full,
   },
   joinGroupText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     color: Theme.colors.text,
   },
-  notificationBanner: {
-    marginHorizontal: Theme.spacing.md,
-    marginVertical: Theme.spacing.md,
-    borderRadius: Theme.borderRadius.lg,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  waveEffect: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    top: '50%',
-    left: '50%',
-    marginTop: -50,
-    marginLeft: -50,
-  },
-  notificationContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Theme.spacing.lg,
-    gap: Theme.spacing.md,
-  },
-  notificationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+
+  // Empty State Styles
+  emptyState: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: Theme.spacing.xl,
   },
-  notificationText: {
-    flex: 1,
-  },
-  notificationTitle: {
-    fontSize: 16,
+  emptyStateTitle: {
+    fontSize: 20,
     fontWeight: '700',
     color: Theme.colors.text,
-    marginBottom: 2,
+    marginTop: Theme.spacing.md,
+    marginBottom: Theme.spacing.sm,
   },
-  notificationSubtitle: {
+  emptyStateText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  modalContainer: {
+
+  // Modal Styles
+  modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
-  modalOverlay: {
-    flex: 1,
+  modalBackground: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  filterModalContent: {
-    height: SCREEN_HEIGHT * 0.7,
+  modalContent: {
+    backgroundColor: Theme.colors.background,
     borderTopLeftRadius: Theme.borderRadius.xl,
     borderTopRightRadius: Theme.borderRadius.xl,
-    overflow: 'hidden',
+    maxHeight: SCREEN_HEIGHT * 0.85,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Theme.spacing.lg,
+    padding: Theme.spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
-  modalTitle: {
-    fontSize: 20,
+  modalCloseButton: {
+    position: 'absolute',
+    top: Theme.spacing.md,
+    right: Theme.spacing.md,
+    padding: Theme.spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: Theme.borderRadius.full,
+  },
+  modalProfilePhoto: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: Theme.spacing.md,
+    borderWidth: 3,
+    borderColor: Theme.colors.primary,
+  },
+  modalVerifiedBadge: {
+    position: 'absolute',
+    top: 80,
+    right: SCREEN_WIDTH / 2 - 80,
+  },
+  modalName: {
+    fontSize: 24,
     fontWeight: '800',
     color: Theme.colors.text,
+    marginBottom: 4,
   },
-  bottomSpacing: {
-    height: 100,
+  modalRole: {
+    fontSize: 16,
+    color: Theme.colors.textSecondary,
+    marginBottom: Theme.spacing.sm,
+  },
+  modalOnlineStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modalOnlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Theme.colors.success,
+  },
+  modalOnlineText: {
+    fontSize: 14,
+    color: Theme.colors.success,
+  },
+  modalBody: {
+    padding: Theme.spacing.xl,
+  },
+  modalSection: {
+    marginBottom: Theme.spacing.xl,
+  },
+  modalSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Theme.colors.text,
+    marginBottom: Theme.spacing.sm,
+  },
+  modalBio: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    lineHeight: 20,
+  },
+  modalDetails: {
+    gap: Theme.spacing.sm,
+  },
+  modalDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.sm,
+  },
+  modalDetailText: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+  },
+  modalAchievements: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    lineHeight: 20,
+  },
+  modalStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: Theme.spacing.xl,
+    paddingVertical: Theme.spacing.lg,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  modalStatBox: {
+    alignItems: 'center',
+  },
+  modalStatValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Theme.colors.text,
+    marginBottom: 4,
+  },
+  modalStatLabel: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+  },
+  modalConnectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Theme.colors.primary,
+    paddingVertical: Theme.spacing.lg,
+    borderRadius: Theme.borderRadius.md,
+    gap: Theme.spacing.sm,
+  },
+  modalConnectText: {
+    color: Theme.colors.text,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

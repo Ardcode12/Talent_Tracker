@@ -10,7 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
   // Import your screens
   import LoginScreen from './screens/LoginScreen';
   import HomeScreen from './screens/HomeScreen';
-  import ExploreScreen from './screens/ExploreScreen';
+  import ExploreScreen from './screens/Assestment';
   import ConnectionsScreen from './screens/ConnectionsScreen';
   import OpportunitiesScreen from './screens/OpportunitiesScreen';
   import ProfileScreen from './screens/ProfileScreen';

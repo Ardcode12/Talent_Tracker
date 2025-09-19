@@ -1,0 +1,8 @@
+{
+    "ideal_knee_angle": 92.3,
+    "knee_tolerance": 9.23,
+    "ideal_hip_depth": 45.8,
+    "hip_tolerance": 4.58,
+    "ideal_squats_per_sec": 1.2,
+    "squats_tolerance": 0.12
+}

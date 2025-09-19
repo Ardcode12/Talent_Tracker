@@ -1,0 +1,65 @@
+{
+  "height_cm": 178.5,
+  "confidence": 0.641,
+  "validation_score": 0.867,
+  "calculation_methods": {
+    "anthropometric": 178.1,
+    "proportional": 159.8,
+    "segmental": 248.0,
+    "geometric": 182.9,
+    "facial": 212.4,
+    "skeletal": 176.2
+  },
+  "camera_analysis": {
+    "estimated_fov": 45,
+    "pixel_to_cm_ratio": 0.10294387043597317,
+    "camera_distance_estimate": 410.41630560342617,
+    "image_center": [
+      653.5,
+      980.0
+    ],
+    "person_center": [
+      0.5144659280776978,
+      0.5237355530261993
+    ]
+  },
+  "perspective_correction": {
+    "horizontal_offset": -652.9855340719223,
+    "vertical_offset": -979.4762644469738,
+    "correction_factor": 1.1498945540962373,
+    "distortion_level": 0.9994655759662998
+  },
+  "accuracy_estimate": "\u00b15-8 cm (Good)",
+  "timestamp": "2025-09-12T00:41:12.398635",
+  "image_path": "test_images\\image.png",
+  "method": "ultra_accurate_multi_method_fusion",
+  "all_method_results": {
+    "anthropometric": 178.1120168934228,
+    "proportional": 159.81092092014813,
+    "segmental": 247.98508549120763,
+    "geometric": 182.88107696100167,
+    "facial": 212.44506370104816,
+    "skeletal": 176.21118175603524
+  },
+  "anthropometric_ratios_used": {
+    "head_to_total": 0.125,
+    "face_to_head": 0.65,
+    "eye_to_chin": 0.45,
+    "shoulder_width_to_height": 0.259,
+    "arm_span_to_height": 1.0,
+    "torso_to_total": 0.52,
+    "leg_to_total": 0.48,
+    "head_shoulder_ratio": 0.14,
+    "shoulder_hip_ratio": 0.26,
+    "hip_knee_ratio": 0.26,
+    "knee_ankle_ratio": 0.26,
+    "ankle_ground_ratio": 0.08
+  },
+  "processing_notes": [
+    "Used 6 independent calculation methods",
+    "Applied advanced image preprocessing",
+    "Performed perspective correction",
+    "Used scientific anthropometric ratios",
+    "Applied statistical validation"
+  ]
+}
