@@ -265,7 +265,7 @@ const AnimatedAuthScreen = () => {
             <View style={styles.logoContainer}>
               <Icon name="sports-soccer" size={60} color="#fff" />
             </View>
-            <Text style={styles.appTitle}>Sportify</Text>
+            <Text style={styles.appTitle}>Talent Tracker</Text>
             <Text style={styles.appSubtitle}>Elite Training Platform</Text>
           </Animated.View>
 

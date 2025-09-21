@@ -22,9 +22,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getImageUrl } from '../services/api'; // ADD THIS LINE
+
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const API_URL = 'http://localhost:8000/api'; // Update with your backend URL
+const API_URL = 'http://10.48.106.35:8000/api'; // Update with your backend URL
 
 // Interfaces
 interface Connection {
@@ -121,65 +123,83 @@ export default function ConnectionsScreen() {
 
   // Fetch all data
   const fetchData = async (resetPage = true) => {
-    try {
-      if (resetPage) {
-        setLoading(true);
-        setCurrentPage(1);
-      }
-
-      const [connectionsData, requestsData, groupsData] = await Promise.all([
-        fetchWithAuth(`${API_URL}/connections`),
-        fetchWithAuth(`${API_URL}/connections/requests`),
-        fetchWithAuth(`${API_URL}/connections/groups`),
-      ]);
-
-      setMyConnections(connectionsData.data || []);
-      setPendingRequests(requestsData.data || []);
-      setGroups(groupsData.data || []);
-
-      // Fetch available connections
-      await fetchAvailableConnections(1, true);
-
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      Alert.alert('Error', 'Failed to load connections');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  try {
+    if (resetPage) {
+      setLoading(true);
+      setCurrentPage(1);
     }
-  };
+
+    const [connectionsData, requestsData, groupsData] = await Promise.all([
+      fetchWithAuth(`${API_URL}/connections`),
+      fetchWithAuth(`${API_URL}/connections/requests`),
+      fetchWithAuth(`${API_URL}/connections/groups`),
+    ]);
+
+    // Process profile photos for connections
+    const processedConnections = (connectionsData.data || []).map(conn => ({
+      ...conn,
+      profilePhoto: getImageUrl(conn.profilePhoto)
+    }));
+
+    // Process profile photos for requests
+    const processedRequests = (requestsData.data || []).map(req => ({
+      ...req,
+      profilePhoto: getImageUrl(req.profilePhoto)
+    }));
+
+    setMyConnections(processedConnections);
+    setPendingRequests(processedRequests);
+    setGroups(groupsData.data || []);
+
+    // Fetch available connections
+    await fetchAvailableConnections(1, true);
+
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    Alert.alert('Error', 'Failed to load connections');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   // Fetch available connections with filters
   const fetchAvailableConnections = async (page = 1, reset = false) => {
-    try {
-      if (!reset && loadingMore) return;
-      
-      setLoadingMore(true);
-      
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '20',
-        ...(selectedRole !== 'all' && { role: selectedRole }),
-        ...(searchText && { search: searchText }),
-      });
+  try {
+    if (!reset && loadingMore) return;
+    
+    setLoadingMore(true);
+    
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: '20',
+      ...(selectedRole !== 'all' && { role: selectedRole }),
+      ...(searchText && { search: searchText }),
+    });
 
-      const response = await fetchWithAuth(`${API_URL}/connections/available?${params}`);
-      
-      if (reset) {
-        setAvailableConnections(response.data || []);
-      } else {
-        setAvailableConnections(prev => [...prev, ...(response.data || [])]);
-      }
-      
-      setCurrentPage(page);
-      setTotalPages(response.pagination?.pages || 1);
-      
-    } catch (error) {
-      console.error('Error fetching available connections:', error);
-    } finally {
-      setLoadingMore(false);
+    const response = await fetchWithAuth(`${API_URL}/connections/available?${params}`);
+    
+    // Process profile photos
+    const processedData = (response.data || []).map(user => ({
+      ...user,
+      profilePhoto: getImageUrl(user.profilePhoto)
+    }));
+    
+    if (reset) {
+      setAvailableConnections(processedData);
+    } else {
+      setAvailableConnections(prev => [...prev, ...processedData]);
     }
-  };
+    
+    setCurrentPage(page);
+    setTotalPages(response.pagination?.pages || 1);
+    
+  } catch (error) {
+    console.error('Error fetching available connections:', error);
+  } finally {
+    setLoadingMore(false);
+  }
+};
 
   // Send connection request
   const handleConnect = async (connectionId: string) => {
@@ -432,9 +452,13 @@ export default function ConnectionsScreen() {
           <View style={styles.discoverCardHeader}>
             <View style={styles.profileSection}>
               <Image 
-                source={{ uri: item.profilePhoto || 'https://via.placeholder.com/80' }} 
-                style={styles.discoverPhoto} 
-              />
+  source={{ uri: item.profilePhoto || 'https://via.placeholder.com/80' }} 
+  style={styles.discoverPhoto}
+  onError={(e) => {
+    console.log('Image load error:', e.nativeEvent.error);
+  }}
+/>
+
               {item.isOnline && <View style={styles.onlineIndicator} />}
               {item.verified && (
                 <View style={styles.verifiedBadge}>
