@@ -1,5 +1,6 @@
 # backend/models.py
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float, Table
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float, Table, UniqueConstraint
+
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -82,6 +83,74 @@ class User(Base):
         backref="connections_received"
     )
 
+# Add to backend/models.py after the existing tables
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    # For one-on-one conversations
+    user1_id = Column(Integer, ForeignKey('users.id'))
+    user2_id = Column(Integer, ForeignKey('users.id'))
+    
+    # Conversation metadata
+    last_message_at = Column(DateTime(timezone=True), nullable=True)
+    last_message_preview = Column(String(255), nullable=True)
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user1 = relationship("User", foreign_keys=[user1_id], backref="conversations_as_user1")
+    user2 = relationship("User", foreign_keys=[user2_id], backref="conversations_as_user2")
+    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
+    
+    # Add unique constraint to prevent duplicate conversations
+    __table_args__ = (
+        UniqueConstraint('user1_id', 'user2_id', name='unique_conversation'),
+    )
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey('conversations.id'))
+    sender_id = Column(Integer, ForeignKey('users.id'))
+    
+    # Message content
+    text = Column(Text, nullable=False)
+    attachment_url = Column(String(500), nullable=True)
+    attachment_type = Column(String(50), nullable=True)  # image, video, document
+    
+    # Status
+    is_read = Column(Boolean, default=False)
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    is_deleted = Column(Boolean, default=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    edited_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    conversation = relationship("Conversation", back_populates="messages")
+    sender = relationship("User", foreign_keys=[sender_id])
+
+
+# Add to User model relationships
+# In the User class, add these relationships:
+# conversations_initiated = relationship(
+#     "Conversation",
+#     foreign_keys="Conversation.user1_id",
+#     back_populates="user1"
+# )
+# conversations_received = relationship(
+#     "Conversation",
+#     foreign_keys="Conversation.user2_id",
+#     back_populates="user2"
+# )
+# sent_messages = relationship("Message", foreign_keys="Message.sender_id")
 
 class Post(Base):
     __tablename__ = "posts"
@@ -134,7 +203,7 @@ class Announcement(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255))
     description = Column(Text)
-    icon = Column(String(10), default="📢")
+    icon = Column(String(10), default="📢") # Corrected emoji: originally 'ðŸ“¢'
     link = Column(String(500), nullable=True)
     priority = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)

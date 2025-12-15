@@ -6,10 +6,10 @@ const getApiUrl = () => {
   if (Platform.OS === 'web') {
     return 'http://localhost:8000';
   } else {
-    // Replace this with YOUR computer's IP address
+    // Replace this with YOUR computer's IP address/
     // To find your IP on Windows: run 'ipconfig' in cmd
     // Look for IPv4 Address under your active network adapter
-    return 'http://10.48.106.35:8000'; // UPDATE THIS WITH YOUR IP
+    return 'http://10.194.241.35:8000'; // UPDATE THIS WITH YOUR IP
   }
 };
 
@@ -88,6 +88,10 @@ class ApiService {
         await AsyncStorage.setItem('isLoggedIn', 'true');
         if (data.user) {
           await AsyncStorage.setItem('userData', JSON.stringify(data.user));
+          // Store user role separately for easy access
+          if (data.user.role) {
+            await AsyncStorage.setItem('userRole', data.user.role);
+          }
         }
       }
 
@@ -137,6 +141,10 @@ class ApiService {
         await AsyncStorage.setItem('isLoggedIn', 'true');
         if (data.user) {
           await AsyncStorage.setItem('userData', JSON.stringify(data.user));
+          // Store user role separately for easy access
+          if (data.user.role) {
+            await AsyncStorage.setItem('userRole', data.user.role);
+          }
         }
       }
 
@@ -209,9 +217,80 @@ class ApiService {
     }
   }
 
+  // Coach specific methods
+  static async getCoachDashboardStats() {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return null;
+      }
+      return await this.makeAuthenticatedRequest('/coach/dashboard-stats');
+    } catch (error) {
+      console.error('Error fetching coach dashboard stats:', error);
+      return null;
+    }
+  }
+
+  static async getCoachAthletes(params = {}) {
+  try {
+    const token = await this.getAuthToken();
+    if (!token) {
+      return { data: [], pagination: {} };
+    }
+    
+    const queryParams = new URLSearchParams(params).toString();
+    const url = queryParams ? `/coach/athletes?${queryParams}` : '/coach/athletes';
+    
+    const response = await this.makeAuthenticatedRequest(url);
+    
+    // Process image URLs in the response
+    if (response.data && Array.isArray(response.data)) {
+      response.data = response.data.map(athlete => ({
+        ...athlete,
+        profile_photo: getImageUrl(athlete.profile_photo || athlete.profile_image)
+      }));
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error fetching coach athletes:', error);
+    return { data: [], pagination: {} };
+  }
+}
+
+  static async getAthleteDetails(athleteId) {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return null;
+      }
+      return await this.makeAuthenticatedRequest(`/coach/athlete/${athleteId}`);
+    } catch (error) {
+      console.error('Error fetching athlete details:', error);
+      return null;
+    }
+  }
+
+  static async getCoachAssessments(params = {}) {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { data: [], stats: null };
+      }
+      
+      const queryParams = new URLSearchParams(params).toString();
+      const url = queryParams ? `/coach/assessments?${queryParams}` : '/coach/assessments';
+      
+      return await this.makeAuthenticatedRequest(url);
+    } catch (error) {
+      console.error('Error fetching coach assessments:', error);
+      return { data: [], stats: null };
+    }
+  }
+
   static async logout() {
     try {
-      await AsyncStorage.multiRemove(['authToken', 'userData', 'isLoggedIn', 'profileCompleted']);
+      await AsyncStorage.multiRemove(['authToken', 'userData', 'isLoggedIn', 'profileCompleted', 'userRole']);
       return true;
     } catch (error) {
       console.error('Logout error:', error);
@@ -220,33 +299,31 @@ class ApiService {
   }
 
   // Assessment methods
-  // Replace the uploadAssessment function with this:
-static async uploadAssessment(formData) {
-  try {
-    const token = await AsyncStorage.getItem('authToken');
-    if (!token) {
-      throw new Error('Authentication required');
-    }
+  static async uploadAssessment(formData) {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
 
-    // ✅ Correct endpoint with /upload
-    const response = await fetch(`${API_BASE_URL}/assessments/upload`, {
-      method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${token}` 
-      },
-      body: formData,
-    });
-    
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.detail || 'Upload failed');
+      const response = await fetch(`${API_BASE_URL}/assessments/upload`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}` 
+        },
+        body: formData,
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || 'Upload failed');
+      }
+      return data;
+    } catch (error) {
+      console.error('Assessment upload error:', error);
+      throw error;
     }
-    return data;
-  } catch (error) {
-    console.error('Assessment upload error:', error);
-    throw error;
   }
-}
 
   static async getAssessments(testType = null) {
     try {
@@ -260,25 +337,24 @@ static async uploadAssessment(formData) {
         : `${API_BASE_URL}/assessments`;
 
       const response = await fetch(url, {
-  headers: { 
-    'Authorization': `Bearer ${token}` 
-  },
-});
+        headers: { 
+          'Authorization': `Bearer ${token}` 
+        },
+      });
 
-// ✅ Safe JSON parse
-const text = await response.text();
-let data;
-try {
-  data = JSON.parse(text);
-} catch (err) {
-  console.error("Bad JSON:", err, "Raw response:", text);
-  return { data: [] }; // fallback
-}
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error("Bad JSON:", err, "Raw response:", text);
+        return { data: [] };
+      }
 
-if (!response.ok) {
-  throw new Error(data.detail || 'Fetch failed');
-}
-return data;
+      if (!response.ok) {
+        throw new Error(data.detail || 'Fetch failed');
+      }
+      return data;
 
     } catch (error) {
       console.error('Get assessments error:', error);
@@ -287,44 +363,45 @@ return data;
   }
 
   static async getAssessmentStats() {
-  try {
-    const token = await AsyncStorage.getItem('authToken');
-    if (!token) {
-      console.log('No auth token found for assessment stats');
-      return null;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/assessments/stats`, {
-      headers: { 
-        'Authorization': `Bearer ${token}` 
-      },
-    });
-
-    if (response.status === 401) {
-      console.log('Authentication failed for assessment stats');
-      return null;
-    }
-
-    const text = await response.text();
-    let data;
     try {
-      data = JSON.parse(text);
-    } catch (err) {
-      console.error("Stats parse error:", text);
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        console.log('No auth token found for assessment stats');
+        return null;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/assessments/stats`, {
+        headers: { 
+          'Authorization': `Bearer ${token}` 
+        },
+      });
+
+      if (response.status === 401) {
+        console.log('Authentication failed for assessment stats');
+        return null;
+      }
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error("Stats parse error:", text);
+        return null;
+      }
+
+      if (!response.ok) {
+        console.error('Assessment stats error:', data.detail || 'Fetch failed');
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get assessment stats error:', error);
       return null;
     }
-
-    if (!response.ok) {
-      console.error('Assessment stats error:', data.detail || 'Fetch failed');
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Get assessment stats error:', error);
-    return null;
   }
-}
+
   // Additional useful methods
   static async getCurrentUser() {
     try {
@@ -349,25 +426,41 @@ return data;
     try {
       const token = await this.getAuthToken();
       
-      if (!token) {
+      // For endpoints that should work without auth
+      const publicEndpoints = ['/athletes/trending', '/announcements'];
+      const isPublicEndpoint = publicEndpoints.some(ep => endpoint.includes(ep));
+      
+      if (!token && !isPublicEndpoint) {
         console.warn('No auth token found for authenticated request');
-        // Return empty data instead of throwing error
         return { data: [] };
       }
       
       const url = `${API_BASE_URL}${endpoint}`;
       console.log('Authenticated request to:', url);
       
+      const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      };
+      
+      // Only add auth header if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(url, {
         ...options,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers,
       });
 
       const text = await response.text();
+      
+      // Check if response is HTML (error page)
+      if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+        console.error('Received HTML instead of JSON:', text.substring(0, 200));
+        throw new Error('Server returned HTML instead of JSON - possible 404 or server error');
+      }
+      
       let data;
       try {
         data = JSON.parse(text);
@@ -377,12 +470,10 @@ return data;
       }
 
       if (!response.ok) {
-        if (response.status === 401) {
-          // Token might be expired or invalid
+        if (response.status === 401 && !isPublicEndpoint) {
           console.warn('Authentication failed, token might be expired');
           await AsyncStorage.removeItem('authToken');
           await AsyncStorage.removeItem('isLoggedIn');
-          // Return empty data instead of throwing
           return { data: [] };
         }
         throw new Error(data.detail || data.message || `HTTP error! status: ${response.status}`);
@@ -473,6 +564,142 @@ return data;
       throw error;
     }
   }
+// Add to frontend/services/api.js
+
+// Messaging methods
+static async getConversations() {
+  try {
+    const response = await this.makeAuthenticatedRequest('/conversations');
+    
+    // Process image URLs
+    if (response.data && Array.isArray(response.data)) {
+      response.data = response.data.map(conv => ({
+        ...conv,
+        other_user: {
+          ...conv.other_user,
+          profile_photo: getImageUrl(conv.other_user.profile_photo)
+        }
+      }));
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    return { data: [] };
+  }
+}
+
+static async startConversation(recipientId) {
+  try {
+    return await this.makeAuthenticatedRequest('/conversations/start', {
+      method: 'POST',
+      body: JSON.stringify({ recipient_id: recipientId })
+    });
+  } catch (error) {
+    console.error('Error starting conversation:', error);
+    throw error;
+  }
+}
+
+static async getMessages(conversationId, page = 1) {
+  try {
+    const response = await this.makeAuthenticatedRequest(
+      `/conversations/${conversationId}/messages?page=${page}`
+    );
+    
+    // Process image URLs in messages
+    if (response.messages && Array.isArray(response.messages)) {
+      response.messages = response.messages.map(msg => ({
+        ...msg,
+        sender: {
+          ...msg.sender,
+          profile_photo: getImageUrl(msg.sender.profile_photo)
+        },
+        attachment_url: getImageUrl(msg.attachment_url)
+      }));
+    }
+    
+    if (response.conversation && response.conversation.other_user) {
+      response.conversation.other_user.profile_photo = getImageUrl(
+        response.conversation.other_user.profile_photo
+      );
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    return { messages: [], conversation: null };
+  }
+}
+
+static async sendMessage(conversationId, text, attachment = null) {
+  try {
+    const messageData = { text };
+    
+    if (attachment) {
+      messageData.attachment_url = attachment.url;
+      messageData.attachment_type = attachment.type;
+    }
+    
+    return await this.makeAuthenticatedRequest(
+      `/conversations/${conversationId}/messages`,
+      {
+        method: 'POST',
+        body: JSON.stringify(messageData)
+      }
+    );
+  } catch (error) {
+    console.error('Error sending message:', error);
+    throw error;
+  }
+}
+
+static async editMessage(messageId, text) {
+  try {
+    return await this.makeAuthenticatedRequest(`/messages/${messageId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ text })
+    });
+  } catch (error) {
+    console.error('Error editing message:', error);
+    throw error;
+  }
+}
+
+static async deleteMessage(messageId) {
+  try {
+    return await this.makeAuthenticatedRequest(`/messages/${messageId}`, {
+      method: 'DELETE'
+    });
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    throw error;
+  }
+}
+
+static async markConversationRead(conversationId) {
+  try {
+    return await this.makeAuthenticatedRequest(
+      `/conversations/${conversationId}/read`,
+      { method: 'POST' }
+    );
+  } catch (error) {
+    console.error('Error marking conversation as read:', error);
+  }
+}
+
+static async getUnreadCount() {
+  try {
+    const response = await this.makeAuthenticatedRequest('/messages/unread-count');
+    return response.unread_count || 0;
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    return 0;
+  }
+}
+
+// Export new methods
+
 
   // HOME SCREEN SPECIFIC METHODS
   static async getFeedPosts(page = 1, limit = 10) {
@@ -753,6 +980,79 @@ return data;
     }
   }
 
+  // Add these methods to your ApiService class
+
+static async getCoachDashboardFeed(page = 1, limit = 20) {
+  try {
+    const token = await this.getAuthToken();
+    if (!token) {
+      return { data: [], total: 0 };
+    }
+    
+    const response = await this.makeAuthenticatedRequest(
+      `/coach/dashboard/feed?page=${page}&limit=${limit}`
+    );
+    
+    // Process image URLs
+    if (response.data && Array.isArray(response.data)) {
+      response.data = response.data.map(post => ({
+        ...post,
+        user: {
+          ...post.user,
+          profile_photo: getImageUrl(post.user.profile_photo)
+        },
+        content: {
+          ...post.content,
+          media_url: getImageUrl(post.content.media_url)
+        }
+      }));
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error fetching coach dashboard feed:', error);
+    return { data: [], total: 0 };
+  }
+}
+
+static async getAssessmentStatistics() {
+  try {
+    const token = await this.getAuthToken();
+    if (!token) {
+      return null;
+    }
+    
+    const response = await this.makeAuthenticatedRequest('/coach/assessments/statistics');
+    
+    // Process image URLs in response
+    if (response.top_performers) {
+      response.top_performers = response.top_performers.map(performer => ({
+        ...performer,
+        profile_photo: getImageUrl(performer.profile_photo)
+      }));
+    }
+    
+    if (response.recent_improvements) {
+      response.recent_improvements = response.recent_improvements.map(item => ({
+        ...item,
+        athlete: {
+          ...item.athlete,
+          profile_photo: getImageUrl(item.athlete.profile_photo)
+        }
+      }));
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error fetching assessment statistics:', error);
+    return null;
+  }
+}
+
+// Export the new methods
+
+
+
   // Test connection
   static async testConnection() {
     try {
@@ -774,7 +1074,7 @@ return data;
       throw new Error('Cannot connect to backend server');
     }
   }
-}
+} // This closes the ApiService class
 
 // Export individual functions for easier imports
 export const login = ApiService.login.bind(ApiService);
@@ -801,5 +1101,19 @@ export const testConnection = ApiService.testConnection.bind(ApiService);
 export const uploadAssessment = ApiService.uploadAssessment.bind(ApiService);
 export const getAssessments = ApiService.getAssessments.bind(ApiService);
 export const getAssessmentStats = ApiService.getAssessmentStats.bind(ApiService);
+export const getCoachDashboardStats = ApiService.getCoachDashboardStats.bind(ApiService);
+export const getCoachAthletes = ApiService.getCoachAthletes.bind(ApiService);
+export const getAthleteDetails = ApiService.getAthleteDetails.bind(ApiService);
+export const getCoachAssessments = ApiService.getCoachAssessments.bind(ApiService);
+export const getCoachDashboardFeed = ApiService.getCoachDashboardFeed.bind(ApiService);
+export const getAssessmentStatistics = ApiService.getAssessmentStatistics.bind(ApiService);
+export const getConversations = ApiService.getConversations.bind(ApiService);
+export const startConversation = ApiService.startConversation.bind(ApiService);
+export const getMessages = ApiService.getMessages.bind(ApiService);
+export const sendMessage = ApiService.sendMessage.bind(ApiService);
+export const editMessage = ApiService.editMessage.bind(ApiService);
+export const deleteMessage = ApiService.deleteMessage.bind(ApiService);
+export const markConversationRead = ApiService.markConversationRead.bind(ApiService);
+export const getUnreadCount = ApiService.getUnreadCount.bind(ApiService);
 
 export default ApiService;

@@ -34,6 +34,7 @@ def analyze_agility(video_path: str, calibration: dict):
         "accelerations": accelerations,
         "num_turns": num_turns,
         "avg_speed": avg_speed,
+        "fps": fps
     }
 
 
@@ -42,7 +43,6 @@ def compute_score(times_arr, peaks, v, a, dt, fps, x_m, px_per_m):
     Compute shuttle run score based on time splits, speed, and acceleration.
     Returns 0-100 score and metadata.
     """
-    # =============================================================
     turn_times = times_arr[peaks] if len(peaks) > 0 else np.array([0.0])
     splits = list(np.diff(turn_times))[:8] if len(turn_times) >= 2 else [total_time := times_arr[-1]] * 4
     total_time = np.nansum(splits)

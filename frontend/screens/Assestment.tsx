@@ -36,8 +36,8 @@ const ASSESSMENT_TESTS = [
     description: 'Test your agility and speed' 
   },
   { 
-    id: 'long_jump', // ✅ Changed from vertical_jump
-    name: 'Long Jump', 
+    id: 'vertical_jump', // ✅ Changed from vertical_jump
+    name: 'Vertical Jump', 
     icon: 'trending-up', 
     color: '#4ECDC4', 
     unit: 'cm', 
@@ -53,11 +53,11 @@ const ASSESSMENT_TESTS = [
   },
   { 
     id: 'height_detection',
-    name: 'Height Detection', 
-    icon: 'accessibility', 
+    name: 'Sit Ups', 
+    icon: 'self-improvement', 
     color: '#F7DC6F', 
     unit: 'cm', 
-    description: 'AI height measurement' 
+    description: 'Test Core Strength' 
   },
 ];
 
@@ -125,27 +125,28 @@ export default function AssessmentScreen() {
   };
 
   const handleVideoUpload = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant camera roll permissions!');
-        return;
-      }
-      
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType.Videos,
-        quality: 1,
-        videoMaxDuration: 60,
-      });
-      
-      if (!result.canceled && result.assets[0]) {
-        await uploadVideo(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Video selection error:', error);
-      Alert.alert('Error', 'Failed to select video');
+  try {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant camera roll permissions!');
+      return;
     }
-  };
+    
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      quality: 1,
+      videoMaxDuration: 60,
+    });
+    
+    if (!result.canceled && result.assets[0]) {
+      await uploadVideo(result.assets[0].uri);
+    }
+  } catch (error) {
+    console.error('Video selection error:', error);
+    Alert.alert('Error', 'Failed to select video');
+  }
+};
+
 
   const handleLiveRecording = async () => {
     setShowUploadModal(false);

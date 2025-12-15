@@ -1,5 +1,6 @@
 import { LinearGradient } from '../components/SafeLinearGradient';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+
 import {
   StyleSheet,
   ScrollView,
@@ -202,11 +203,11 @@ export default function HomeScreen({ navigation }) {
   const renderTopNavigation = () => (
     <View style={styles.navigationBar}>
       <View style={styles.navContent}>
-        <Text style={styles.appName}>AI-Sportify</Text>
+        <Text style={styles.appName}>Talent Tracker</Text>
         
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
-          <Text style={styles.searchPlaceholder}>Search athletes, coaches...</Text>
+          <Text style={styles.searchPlaceholder}></Text>
         </View>
         
         <View style={styles.navIcons}>

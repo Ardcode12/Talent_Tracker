@@ -119,83 +119,106 @@ const AnimatedAuthScreen = () => {
 
   // ✅ UPDATED handleAuth function with proper profile completion check
   const handleAuth = async () => {
-    if (!validateForm()) return;
-    setLoading(true);
+  if (!validateForm()) return;
+  setLoading(true);
 
-    try {
-      let response;
-      if (isLogin) {
-        // LOGIN FLOW
-        response = await ApiService.login(formData.email, formData.password);
+  try {
+    let response;
+    if (isLogin) {
+      // LOGIN FLOW
+      response = await ApiService.login(formData.email, formData.password);
+      
+      if (response && response.token) {
+        // Save login data
+        await AsyncStorage.setItem('authToken', response.token);
+        await AsyncStorage.setItem('userData', JSON.stringify(response.user));
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+        await AsyncStorage.setItem('userRole', response.user.role);
         
-        if (response && response.token) {
-          // Save login data
-          await AsyncStorage.setItem('authToken', response.token);
-          await AsyncStorage.setItem('userData', JSON.stringify(response.user));
-          await AsyncStorage.setItem('isLoggedIn', 'true');
+        console.log('Login successful, user role:', response.user.role);
+        
+        // Check if profile is complete
+        const isProfileComplete = checkProfileCompletion(response.user);
+        
+        const profileCompletedFlag = await AsyncStorage.getItem('profileCompleted');
+        const userSpecificFlag = await AsyncStorage.getItem(`profile_completed_${response.user.id}`);
+        
+        if (isProfileComplete || profileCompletedFlag === 'true' || userSpecificFlag === 'true') {
+          await AsyncStorage.setItem('profileCompleted', 'true');
           
-          // Check if profile is already completed based on user data
-          const isProfileComplete = checkProfileCompletion(response.user);
-          
-          // Also check if user has marked profile as completed before
-          const profileCompletedFlag = await AsyncStorage.getItem('profileCompleted');
-          const userSpecificFlag = await AsyncStorage.getItem(`profile_completed_${response.user.id}`);
-          
-          if (isProfileComplete || profileCompletedFlag === 'true' || userSpecificFlag === 'true') {
-            // Profile is completed, mark it and go to main app
-            await AsyncStorage.setItem('profileCompleted', 'true');
+          // Navigate based on role
+          if (response.user.role === 'coach') {
             navigation.reset({
               index: 0,
-              routes: [{ name: 'Main' }],
-            });
-          } else if (profileCompletedFlag === 'skipped') {
-            // User previously skipped, don't force them again
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Main' }],
+              routes: [{ name: 'CoachMain' }],
             });
           } else {
-            // Profile not completed, go to profile completion screen
             navigation.reset({
               index: 0,
-              routes: [{ name: 'ProfileCompletion' }],
+              routes: [{ name: 'Main' }],
             });
           }
-        }
-      } else {
-        // SIGNUP FLOW
-        const signupData = {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          phone: formData.phone,
-          role: userType,
-          sport: formData.sport,
-          experience: formData.experience,
-          specialization: formData.sport,
-        };
-        response = await ApiService.signup(signupData);
-        
-        if (response && response.token) {
-          // Save signup data
-          await AsyncStorage.setItem('authToken', response.token);
-          await AsyncStorage.setItem('userData', JSON.stringify(response.user));
-          await AsyncStorage.setItem('isLoggedIn', 'true');
-          
-          // For new signups, always go to profile completion
-          await AsyncStorage.setItem('profileCompleted', 'pending');
+        } else if (profileCompletedFlag === 'skipped') {
+          // Navigate based on role even if skipped
+          if (response.user.role === 'coach') {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'CoachMain' }],
+            });
+          } else {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Main' }],
+            });
+          }
+        } else {
+          // Profile not completed
           navigation.reset({
             index: 0,
             routes: [{ name: 'ProfileCompletion' }],
           });
         }
       }
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Something went wrong. Try again.");
-    } finally {
-      setLoading(false);
+    } else {
+      // SIGNUP FLOW
+      const signupData = {
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        phone: formData.phone,
+        role: userType, // 'athlete' or 'coach'
+        sport: formData.sport,
+        experience: userType === 'coach' ? formData.experience : null,
+        specialization: userType === 'coach' ? formData.sport : null
+      };
+      
+      response = await ApiService.signup(signupData);
+      
+      if (response && response.token) {
+        // Save signup data
+        await AsyncStorage.setItem('authToken', response.token);
+        await AsyncStorage.setItem('userData', JSON.stringify(response.user));
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+        await AsyncStorage.setItem('userRole', response.user.role);
+        
+        console.log('Signup successful, user role:', response.user.role);
+        
+        // Navigate to profile completion
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'ProfileCompletion' }],
+        });
+      }
     }
-  };
+  } catch (error: any) {
+    console.error('Auth error:', error);
+    Alert.alert("Error", error.message || "Something went wrong. Try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -265,7 +288,7 @@ const AnimatedAuthScreen = () => {
             <View style={styles.logoContainer}>
               <Icon name="sports-soccer" size={60} color="#fff" />
             </View>
-            <Text style={styles.appTitle}>Sportify</Text>
+            <Text style={styles.appTitle}>Talent Tracker</Text>
             <Text style={styles.appSubtitle}>Elite Training Platform</Text>
           </Animated.View>
 

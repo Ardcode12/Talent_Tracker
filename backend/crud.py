@@ -1,14 +1,9 @@
+# backend/crud.py
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-import models, schemas  # Changed from . import to direct import
+import models, schemas 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+# Import the password hashing/verification functions from core.security
+from core.security import get_password_hash, verify_password
 
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.password)

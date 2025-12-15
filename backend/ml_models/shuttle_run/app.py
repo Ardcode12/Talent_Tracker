@@ -1,22 +1,18 @@
 import os
-import traceback
-from datetime import datetime
 from pathlib import Path
-
+from datetime import datetime
+import traceback
+import cv2
 import numpy as np
-import joblib
-import tensorflow as tf
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
-from assessment.agility_analyzer import analyze_agility, compute_score
+import mediapipe as mp
 
 # -------------------------------
 # App Setup
 # -------------------------------
-app = FastAPI(title="Shuttle Run / Agility API", version="1.0")
-
+app = FastAPI(title="Shuttle Run API", version="1.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,104 +21,106 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(_file_).resolve().parent
 VIDEOS_DIR = ROOT / "videos"
 VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
 # -------------------------------
-# ML Model Setup
+# Import your functions
 # -------------------------------
-MODELS_DIR = ROOT / "models"
-MODEL_PATH = MODELS_DIR / "shuttle_run_model.keras"
-SCALER_PATH = MODELS_DIR / "shuttle_run_model_scaler.pkl"
-ENCODER_PATH = MODELS_DIR / "shuttle_run_label_encoder.pkl"
-
-model, scaler, label_encoder = None, None, None
-
-try:
-    if MODEL_PATH.exists():
-        model = tf.keras.models.load_model(MODEL_PATH)
-    if SCALER_PATH.exists():
-        scaler = joblib.load(SCALER_PATH)
-    if ENCODER_PATH.exists():
-        label_encoder = joblib.load(ENCODER_PATH)
-except Exception as e:
-    print(f"❌ Failed to load model/scaler/encoder: {e}")
+from assessment.agility_analyzer import analyze_agility, compute_score
 
 # -------------------------------
-# Endpoints
+# Helper: Human shuttle-run detection
 # -------------------------------
-@app.get("/")
-def root():
-    return {"status": "ok", "message": "Agility API running"}
+def is_valid_shuttle_run(video_path, min_turns=2, distance_threshold=2.0):
+    mp_pose = mp.solutions.pose
+    cap = cv2.VideoCapture(video_path)
+    turn_count = 0
+    prev_x = None
 
+    with mp_pose.Pose(static_image_mode=False) as pose:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            results = pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            if results.pose_landmarks:
+                left_hip = results.pose_landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP]
+                right_hip = results.pose_landmarks.landmark[mp.solutions.pose.PoseLandmark.RIGHT_HIP]
+                curr_x = (left_hip.x + right_hip.x) / 2.0
+                if prev_x is not None and abs(curr_x - prev_x) > distance_threshold * 0.01:
+                    turn_count += 1
+                prev_x = curr_x
+    cap.release()
+    return turn_count >= min_turns
+
+# -------------------------------
+# Extract features + score using functions
+# -------------------------------
+def analyze_video(video_path):
+    features_data = analyze_agility(video_path, calibration={"distance_m": 10.0})
+
+    splits = features_data.get("splits", [])
+    speeds = features_data.get("speeds", [])
+    accelerations = features_data.get("accelerations", [])
+    total_time = features_data.get("total_time", 1.0)
+    num_turns = features_data.get("num_turns", len(splits))
+    dt = [1.0/30.0]*num_turns
+    x_m = [0]*num_turns
+    px_per_m = 100.0
+
+    # Convert to numpy arrays for scoring
+    times_arr = np.cumsum(splits)
+    peaks = np.arange(len(splits))
+    v = np.array(speeds)
+    a = np.array(accelerations)
+    dt_arr = np.array(dt)
+    x_m_arr = np.array(x_m)
+
+    score_result = compute_score(times_arr, peaks, v, a, dt_arr, 30, x_m_arr, px_per_m)
+
+    # Ensure features length is 20 for ML compatibility
+    features = np.concatenate([
+        [score_result.get("mean_speed_m_s", 0.0), total_time, num_turns],
+        splits,
+        np.zeros(20 - 3 - len(splits))
+    ]).tolist()
+
+    return features, score_result
+
+# -------------------------------
+# Endpoint
+# -------------------------------
 @app.post("/api/ml/predict_video")
 async def predict_video(
     file: UploadFile = File(...),
     athlete_name: str = Form(...),
-    test_type: str = Form(...)
+    test_type: str = Form(...),
 ):
-    if model is None or scaler is None or label_encoder is None:
-        raise HTTPException(status_code=503, detail="Model/scaler/encoder not loaded.")
-
     try:
+        # Save video
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         safe_name = f"{timestamp}_{file.filename}"
         video_path = VIDEOS_DIR / safe_name
-
         with open(video_path, "wb") as f:
             f.write(await file.read())
 
-        # Extract features
-        result = analyze_agility(str(video_path), calibration={"distance_m": 10.0})
-        features = [
-            result.get("avg_speed", 0.0),
-            result.get("total_time", 0.0),
-            result.get("num_turns", 0.0),
-            *result.get("splits", []),
-            *result.get("speeds", []),
-            *result.get("accelerations", []),
-        ]
+        # Validate human shuttle-run
+        if not is_valid_shuttle_run(str(video_path)):
+            return JSONResponse(
+                {"error": "No valid shuttle-run activity detected in video"},
+                status_code=400
+            )
 
-        # If some devices have missing features, pad zeros to match scaler
-        if scaler is not None:
-            expected_features = scaler.mean_.shape[0] if hasattr(scaler, "mean_") else len(features)
-            if len(features) < expected_features:
-                features = features + [0.0] * (expected_features - len(features))
-            features = np.array(features).reshape(1, -1)
-            features_scaled = scaler.transform(features)
-            preds = model.predict(features_scaled)
-            pred_idx = int(np.argmax(preds, axis=1)[0])
-            confidence = float(np.max(preds))
-            pred_class = label_encoder.inverse_transform([pred_idx])[0]
-        else:
-            pred_class = "unknown"
-            confidence = 0.0
-
-        # Compute score
-        times_arr = np.linspace(0, result["total_time"], len(result["splits"]))
-        peaks = np.arange(len(result["splits"]))
-        score_data = compute_score(
-            times_arr,
-            peaks,
-            v=np.array(result["speeds"]),
-            a=np.array(result["accelerations"]),
-            dt=np.array([result["total_time"]/len(result["splits"])]*len(result["splits"])),
-            fps=30,
-            x_m=np.array(result["speeds"]),
-            px_per_m=100
-        )
+        # Analyze video and compute score
+        features, score_data = analyze_video(str(video_path))
 
         return {
             "athlete_name": athlete_name,
             "test_type": test_type,
-            "predicted_class": pred_class,
-            "confidence": confidence,
-            "features": features.tolist(),
-            "score_data": {
-                "score": score_data["score_0_100"],
-                "feedback": "Good performance!" if score_data["score_0_100"] > 70 else "Needs improvement.",
-            },
+            "features": features,
+            "score_data": score_data,
             "video_path": str(video_path)
         }
 

@@ -1,0 +1,386 @@
+﻿import React, { useEffect, useState } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, ActivityIndicator } from 'react-native';
+import MessagesScreen from './screens/MessagesScreen';
+import ChatScreen from './screens/ChatScreen';
+import CreateOpportunityScreen from './screens/CreateOpportunityWrapper';
+
+
+// Import your screens
+import LoginScreen from './screens/LoginScreen';
+import HomeScreen from './screens/HomeScreen';
+import ExploreScreen from './screens/Assestment';
+import ConnectionsScreen from './screens/ConnectionsScreen';
+import OpportunitiesScreen from './screens/OpportunitiesScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import ProfileCompletionScreen from './screens/ProfileCompletionScreen';
+import CreatePostScreen from './screens/CreatePostScreen';
+import CoachDashboard from './screens/CoachDashboard';
+import CoachAssessments from './screens/CoachAssessments';
+
+const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
+// Athlete Tab Navigator
+function AthleteTabNavigator() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          switch (route.name) {
+            case 'Home':
+              iconName = focused ? 'home' : 'home-outline';
+              break;
+            case 'Assessments':
+              iconName = focused ? 'compass' : 'compass-outline';
+              break;
+            case 'Connections':
+              iconName = focused ? 'people' : 'people-outline';
+              break;
+            case 'Opportunities':
+              iconName = focused ? 'briefcase' : 'briefcase-outline';
+              break;
+            case 'Profile':
+              iconName = focused ? 'person' : 'person-outline';
+              break;
+            default:
+              iconName = 'alert-circle-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#007AFF',
+        tabBarInactiveTintColor: '#8E8E93',
+        tabBarStyle: {
+          backgroundColor: '#1a1a1a',
+          borderTopWidth: 0,
+          elevation: 0,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        headerShown: false,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Assessments" component={ExploreScreen} />
+      <Tab.Screen name="Connections" component={ConnectionsScreen} />
+      <Tab.Screen name="Opportunities" component={OpportunitiesScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
+    </Tab.Navigator>
+  );
+}
+
+// Coach Tab Navigator
+function CoachTabNavigator() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          switch (route.name) {
+            case 'Dashboard':
+              iconName = focused ? 'speedometer' : 'speedometer-outline';
+              break;
+            case 'Athletes':
+              iconName = focused ? 'people' : 'people-outline';
+              break;
+            case 'Assessments':
+              iconName = focused ? 'analytics' : 'analytics-outline';
+              break;
+            case 'Messages':
+              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+              break;
+            case 'Profile':
+              iconName = focused ? 'person' : 'person-outline';
+              break;
+            default:
+              iconName = 'alert-circle-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#667eea',
+        tabBarInactiveTintColor: '#8E8E93',
+        tabBarStyle: {
+          backgroundColor: '#1a1a1a',
+          borderTopWidth: 0,
+          elevation: 0,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        headerShown: false,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
+      })}
+    >
+       <Tab.Screen name="Dashboard" component={CoachDashboard} />
+      <Tab.Screen name="Athletes" component={ConnectionsScreen} />
+      <Tab.Screen name="Assessments" component={CoachAssessments} />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+}
+
+export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [initialRoute, setInitialRoute] = useState('Login');
+
+  const checkAuthStatus = async () => {
+    try {
+      const [isLoggedIn, profileCompleted, token, userData, userRole] = await Promise.all([
+        AsyncStorage.getItem('isLoggedIn'),
+        AsyncStorage.getItem('profileCompleted'),
+        AsyncStorage.getItem('authToken'),
+        AsyncStorage.getItem('userData'),
+        AsyncStorage.getItem('userRole')
+      ]);
+      
+      console.log('Auth check - Role:', userRole);
+      
+      if (isLoggedIn === 'true' && token !== null) {
+        let user = null;
+        if (userData) {
+          try {
+            user = JSON.parse(userData);
+          } catch (e) {
+            console.error('Error parsing user data:', e);
+          }
+        }
+
+        const isProfileComplete = user && !!(
+          user.age && 
+          user.location && 
+          (user.profile_image || user.profile_photo)
+        );
+
+        const userSpecificFlag = user ? await AsyncStorage.getItem(`profile_completed_${user.id}`) : null;
+
+        if (isProfileComplete || profileCompleted === 'true' || userSpecificFlag === 'true' || profileCompleted === 'skipped') {
+          const role = userRole || (user && user.role);
+          console.log('Navigating based on role:', role);
+          
+          if (role === 'coach') {
+            setInitialRoute('CoachMain');
+          } else {
+            setInitialRoute('Main');
+          }
+        } else {
+          setInitialRoute('ProfileCompletion');
+        }
+      } else {
+        setInitialRoute('Login');
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setInitialRoute('Login');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName={initialRoute}
+          screenOptions={{
+            headerShown: false,
+            cardStyle: { backgroundColor: '#000' },
+            animationEnabled: true,
+            gestureEnabled: true,
+          }}
+        >
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen}
+            options={{
+              animationTypeForReplace: 'push',
+            }}
+          />
+          <Stack.Screen 
+            name="ProfileCompletion" 
+            component={ProfileCompletionScreen}
+            options={{
+              animationTypeForReplace: 'push',
+              gestureEnabled: false,
+            }}
+          />
+          <Stack.Screen 
+            name="Main" 
+            component={AthleteTabNavigator}
+            options={{
+              animationEnabled: false,
+              gestureEnabled: false,
+            }}
+          />
+          <Stack.Screen 
+            name="CoachMain" 
+            component={CoachTabNavigator}
+            options={{
+              animationEnabled: false,
+              gestureEnabled: false,
+            }}
+          />
+          <Stack.Screen 
+  name="Chat" 
+  component={ChatScreen}
+  options={{
+    headerShown: true,
+  }}
+/>
+<Stack.Screen 
+  name="CreateOpportunity" 
+  component={CreateOpportunityScreen}
+  options={{
+    animation: 'slide_from_bottom',
+    presentation: 'modal',
+  }}
+/>
+
+          <Stack.Screen 
+            name="CreatePost" 
+            component={CreatePostScreen}
+            options={{
+              animation: 'slide_from_bottom',
+              presentation: 'modal',
+              headerShown: false,
+              gestureEnabled: true,
+              cardOverlayEnabled: true,
+              cardStyleInterpolator: ({ current: { progress } }) => ({
+                cardStyle: {
+                  opacity: progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 1],
+                  }),
+                },
+                overlayStyle: {
+                  opacity: progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 0.5],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              }),
+            }}
+          />
+          <Stack.Screen 
+            name="TrendingAthletes" 
+            component={ExploreScreen}
+            options={{
+              title: 'Trending Athletes',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: '#1a1a1a',
+              },
+              headerTintColor: '#fff',
+            }}
+          />
+          <Stack.Screen 
+            name="AnnouncementDetail" 
+            component={ExploreScreen}
+            options={{
+              title: 'Announcement',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: '#1a1a1a',
+              },
+              headerTintColor: '#fff',
+            }}
+          />
+          <Stack.Screen 
+            name="Comments" 
+            component={ExploreScreen}
+            options={{
+              title: 'Comments',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: '#1a1a1a',
+              },
+              headerTintColor: '#fff',
+            }}
+          />
+          <Stack.Screen 
+            name="Assessment" 
+            component={ExploreScreen}
+            options={{
+              title: 'AI Assessment',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: '#1a1a1a',
+              },
+              headerTintColor: '#fff',
+            }}
+          />
+          <Stack.Screen 
+            name="UploadVideo" 
+            component={ExploreScreen}
+            options={{
+              title: 'Upload Video',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: '#1a1a1a',
+              },
+              headerTintColor: '#fff',
+            }}
+          />
+          <Stack.Screen 
+            name="ViewReports" 
+            component={ExploreScreen}
+            options={{
+              title: 'Performance Reports',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: '#1a1a1a',
+              },
+              headerTintColor: '#fff',
+            }}
+          />
+          <Stack.Screen 
+            name="LiveAssessment" 
+            component={ExploreScreen}
+            options={{
+              title: 'Live Assessment',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: '#1a1a1a',
+              },
+              headerTintColor: '#fff',
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
+}

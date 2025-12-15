@@ -1,5 +1,6 @@
+# backend/schemas.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -23,7 +24,7 @@ class UserLogin(BaseModel):
     password: str
 
 
-# 🔑 Full profile schema
+# 🔑 Full profile schema (Corrected emoji: originally 'ðŸ”‘')
 class UserProfile(UserBase):
     id: int
     age: Optional[int] = None
@@ -37,12 +38,24 @@ class UserProfile(UserBase):
     profile_photo: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Updated from orm_mode
 
 
 class AuthResponse(BaseModel):
     token: str
     user: UserProfile
+
+
+# ---------- SIMPLIFIED USER FOR POSTS/MESSAGES ----------
+class PostUser(BaseModel):
+    id: int
+    name: str
+    profile_photo: Optional[str]
+    sport: Optional[str]
+    location: Optional[str]
+
+    class Config:
+        from_attributes = True
 
 
 # ---------- POSTS ----------
@@ -54,17 +67,6 @@ class PostBase(BaseModel):
 
 class PostCreate(PostBase):
     pass
-
-
-class PostUser(BaseModel):
-    id: int
-    name: str
-    profile_photo: Optional[str]
-    sport: Optional[str]
-    location: Optional[str]
-
-    class Config:
-        from_attributes = True
 
 
 class PostResponse(BaseModel):
@@ -97,6 +99,63 @@ class CommentResponse(BaseModel):
     text: str
     created_at: datetime
 
+    class Config:
+        from_attributes = True
+
+
+# ---------- MESSAGES ----------
+class MessageBase(BaseModel):
+    text: str
+    attachment_url: Optional[str] = None
+    attachment_type: Optional[str] = None
+
+
+class MessageCreate(MessageBase):
+    pass
+
+
+class MessageUpdate(BaseModel):
+    text: Optional[str] = None
+
+
+class MessageResponse(BaseModel):
+    id: int
+    sender_id: int
+    sender: PostUser
+    text: str
+    attachment_url: Optional[str]
+    attachment_type: Optional[str]
+    is_read: bool
+    created_at: datetime
+    edited_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+
+class ConversationBase(BaseModel):
+    pass
+
+
+class ConversationCreate(BaseModel):
+    recipient_id: int
+
+
+class ConversationResponse(BaseModel):
+    id: int
+    other_user: PostUser
+    last_message_at: Optional[datetime]
+    last_message_preview: Optional[str]
+    unread_count: int = 0
+    is_online: bool = False
+    
+    class Config:
+        from_attributes = True
+
+
+class ConversationDetailResponse(ConversationResponse):
+    messages: List[MessageResponse] = []
+    
     class Config:
         from_attributes = True
 
