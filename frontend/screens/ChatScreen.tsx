@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+// frontend/screens/ChatScreen.tsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,16 +12,20 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Theme } from '../constants/Theme';
 import {
   getMessages,
   sendMessage,
   deleteMessage,
   markConversationRead,
+  getImageUrl,
 } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import useWebSocket from '../hooks/useWebSocket';
 
 export default function ChatScreen({ route, navigation }) {
   const { conversationId, otherUser } = route.params;
@@ -31,44 +36,107 @@ export default function ChatScreen({ route, navigation }) {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   
   const flatListRef = useRef(null);
+  
+  // WebSocket connection
+  const { isConnected, lastMessage } = useWebSocket(conversationId);
 
+  // Handle WebSocket messages
   useEffect(() => {
-    loadCurrentUser();
-    loadMessages();
-    markAsRead();
+    if (lastMessage) {
+      switch (lastMessage.type) {
+        case 'new_message':
+          // Only add if not from current user (we add our own messages immediately)
+          if (lastMessage.message.sender_id !== currentUserId) {
+            setMessages(prev => [...prev, lastMessage.message]);
+            scrollToBottom();
+          }
+          break;
+        case 'message_edited':
+          setMessages(prev => prev.map(msg => 
+            msg.id === lastMessage.message_id 
+              ? { ...msg, text: lastMessage.text, edited_at: lastMessage.edited_at }
+              : msg
+          ));
+          break;
+        case 'message_deleted':
+          setMessages(prev => prev.filter(msg => msg.id !== lastMessage.message_id));
+          break;
+        case 'messages_read':
+          if (lastMessage.reader_id !== currentUserId) {
+            setMessages(prev => prev.map(msg => 
+              msg.sender_id === currentUserId ? { ...msg, is_read: true } : msg
+            ));
+          }
+          break;
+      }
+    }
+  }, [lastMessage, currentUserId]);
+
+  // Keyboard listeners
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      scrollToBottom();
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadCurrentUser();
+      loadMessages();
+      markAsRead();
+    }, [])
+  );
+
   const loadCurrentUser = async () => {
-    const userData = await AsyncStorage.getItem('userData');
-    if (userData) {
-      const user = JSON.parse(userData);
-      setCurrentUserId(user.id);
+    try {
+      const userData = await AsyncStorage.getItem('userData');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setCurrentUserId(user.id);
+      }
+    } catch (error) {
+      console.error('Error loading current user:', error);
     }
   };
 
   const loadMessages = async (pageNum = 1, append = false) => {
     try {
       if (pageNum === 1) setLoading(true);
+      if (append) setLoadingMore(true);
       
       const response = await getMessages(conversationId, pageNum);
       
       if (response.messages) {
         if (append) {
+          // Prepend older messages
           setMessages(prev => [...response.messages, ...prev]);
         } else {
           setMessages(response.messages);
+          // Scroll to bottom on initial load
+          setTimeout(scrollToBottom, 100);
         }
         setHasMore(response.has_more);
         setPage(pageNum);
       }
     } catch (error) {
       console.error('Error loading messages:', error);
+      Alert.alert('Error', 'Failed to load messages');
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
@@ -80,25 +148,51 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
+  const scrollToBottom = () => {
+    if (flatListRef.current && messages.length > 0) {
+      flatListRef.current.scrollToEnd({ animated: true });
+    }
+  };
+
   const handleSend = async () => {
     if (!inputText.trim() || sending) return;
     
-    setSending(true);
     const messageText = inputText.trim();
     setInputText('');
+    setSending(true);
+    
+    // Optimistic update - add message immediately
+    const tempId = `temp_${Date.now()}`;
+    const optimisticMessage = {
+      id: tempId,
+      sender_id: currentUserId,
+      sender: {
+        id: currentUserId,
+        name: 'You',
+        profile_photo: null,
+      },
+      text: messageText,
+      is_read: false,
+      created_at: new Date().toISOString(),
+      sending: true, // Flag for UI
+    };
+    
+    setMessages(prev => [...prev, optimisticMessage]);
+    scrollToBottom();
     
     try {
-            const newMessage = await sendMessage(conversationId, messageText);
-      setMessages(prev => [...prev, newMessage]);
+      const newMessage = await sendMessage(conversationId, messageText);
       
-      // Scroll to bottom after sending
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      // Replace optimistic message with real one
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId ? { ...newMessage, sending: false } : msg
+      ));
     } catch (error) {
       console.error('Error sending message:', error);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
       Alert.alert('Error', 'Failed to send message. Please try again.');
-      setInputText(messageText); // Restore message if failed
+      setInputText(messageText); // Restore message
     } finally {
       setSending(false);
     }
@@ -127,7 +221,7 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   const loadMoreMessages = () => {
-    if (!loading && hasMore && page > 0) {
+    if (!loadingMore && hasMore && page > 0) {
       loadMessages(page + 1, true);
     }
   };
@@ -147,74 +241,143 @@ export default function ChatScreen({ route, navigation }) {
       return 'Yesterday ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
+           date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const renderMessage = ({ item, index }) => {
     const isOwnMessage = item.sender_id === currentUserId;
     const showAvatar = !isOwnMessage && (
-      index === messages.length - 1 || 
-      messages[index + 1]?.sender_id !== item.sender_id
+      index === 0 || 
+      messages[index - 1]?.sender_id !== item.sender_id
     );
+    const showTimestamp = index === 0 || 
+      new Date(item.created_at).getTime() - new Date(messages[index - 1]?.created_at).getTime() > 300000; // 5 min gap
 
     return (
-      <View style={[
-        styles.messageContainer,
-        isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer
-      ]}>
-        {showAvatar && !isOwnMessage && (
-          <Image
-            source={{ uri: item.sender.profile_photo || 'https://via.placeholder.com/40' }}
-            style={styles.messageAvatar}
-          />
-        )}
-        
-        <TouchableOpacity
-          style={[
-            styles.messageBubble,
-            isOwnMessage ? styles.ownMessageBubble : styles.otherMessageBubble,
-            !showAvatar && !isOwnMessage && styles.messageBubbleWithoutAvatar
-          ]}
-          onLongPress={() => isOwnMessage && handleDeleteMessage(item.id)}
-          activeOpacity={0.8}
-        >
-          <Text style={[
-            styles.messageText,
-            isOwnMessage ? styles.ownMessageText : styles.otherMessageText
-          ]}>
-            {item.text}
+      <View>
+        {showTimestamp && (
+          <Text style={styles.timestampDivider}>
+            {formatMessageTime(item.created_at)}
           </Text>
+        )}
+        <View style={[
+          styles.messageContainer,
+          isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer
+        ]}>
+          {showAvatar && !isOwnMessage && (
+            <Image
+              source={{ 
+                uri: item.sender?.profile_photo || 
+                     otherUser?.profile_photo || 
+                     'https://via.placeholder.com/40' 
+              }}
+              style={styles.messageAvatar}
+            />
+          )}
           
-          <View style={styles.messageFooter}>
+          <TouchableOpacity
+            style={[
+              styles.messageBubble,
+              isOwnMessage ? styles.ownMessageBubble : styles.otherMessageBubble,
+              !showAvatar && !isOwnMessage && styles.messageBubbleWithoutAvatar,
+              item.sending && styles.sendingBubble
+            ]}
+            onLongPress={() => isOwnMessage && !item.sending && handleDeleteMessage(item.id)}
+            activeOpacity={0.8}
+          >
             <Text style={[
-              styles.messageTime,
-              isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime
+              styles.messageText,
+              isOwnMessage ? styles.ownMessageText : styles.otherMessageText
             ]}>
-              {formatMessageTime(item.created_at)}
+              {item.text}
             </Text>
             
-            {isOwnMessage && (
-              <Ionicons 
-                name={item.is_read ? "checkmark-done" : "checkmark"} 
-                size={16} 
-                color={item.is_read ? Theme.colors.primary : "#999"} 
-                style={styles.readReceipt}
-              />
+            <View style={styles.messageFooter}>
+              {item.sending ? (
+                <ActivityIndicator size={12} color="rgba(255,255,255,0.7)" />
+              ) : (
+                <>
+                  <Text style={[
+                    styles.messageTime,
+                    isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime
+                  ]}>
+                    {new Date(item.created_at).toLocaleTimeString([], { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </Text>
+                  
+                  {isOwnMessage && (
+                    <Ionicons 
+                      name={item.is_read ? "checkmark-done" : "checkmark"} 
+                      size={14} 
+                      color={item.is_read ? "#4CAF50" : "rgba(255,255,255,0.5)"} 
+                      style={styles.readReceipt}
+                    />
+                  )}
+                </>
+              )}
+            </View>
+            
+            {item.edited_at && (
+              <Text style={styles.editedLabel}>(edited)</Text>
             )}
-          </View>
-          
-          {item.edited_at && (
-            <Text style={styles.editedLabel}>(edited)</Text>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
 
-  if (loading && page === 1) {
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity 
+        onPress={() => navigation.goBack()} 
+        style={styles.backButton}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="arrow-back" size={24} color={Theme.colors.text} />
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.headerContent}
+        onPress={() => navigation.navigate('Profile', { userId: otherUser?.id })}
+      >
+        <Image
+          source={{ 
+            uri: otherUser?.profile_photo || 
+                 otherUser?.profilePhoto || 
+                 'https://via.placeholder.com/40' 
+          }}
+          style={styles.headerAvatar}
+        />
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerName}>{otherUser?.name || 'User'}</Text>
+          <View style={styles.headerStatusRow}>
+            {isConnected && (
+              <View style={styles.wsIndicator} />
+            )}
+            <Text style={styles.headerStatus}>
+              {otherUser?.is_online ? '🟢 Online' : '⚪ Offline'} • {otherUser?.role || 'User'} • {otherUser?.sport || 'Sport'}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+      
+      <TouchableOpacity style={styles.moreButton}>
+        <Ionicons name="ellipsis-vertical" size={24} color={Theme.colors.text} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (loading && messages.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Theme.colors.primary} />
+      <View style={styles.container}>
+        {renderHeader()}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Theme.colors.primary} />
+          <Text style={styles.loadingText}>Loading messages...</Text>
+        </View>
       </View>
     );
   }
@@ -222,35 +385,10 @@ export default function ChatScreen({ route, navigation }) {
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={Theme.colors.text} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.headerContent}
-          onPress={() => navigation.navigate('Profile', { userId: otherUser.id })}
-        >
-          <Image
-            source={{ uri: otherUser.profile_photo || 'https://via.placeholder.com/40' }}
-            style={styles.headerAvatar}
-          />
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerName}>{otherUser.name}</Text>
-            <Text style={styles.headerStatus}>
-              {otherUser.is_online ? 'Online' : 'Offline'} • {otherUser.role} • {otherUser.sport}
-            </Text>
-          </View>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-vertical" size={24} color={Theme.colors.text} />
-        </TouchableOpacity>
-      </View>
+      {renderHeader()}
 
       {/* Messages List */}
       <FlatList
@@ -258,25 +396,37 @@ export default function ChatScreen({ route, navigation }) {
         data={messages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id.toString()}
-        inverted={false}
         contentContainerStyle={styles.messagesList}
-        onEndReached={loadMoreMessages}
-        onEndReachedThreshold={0.5}
-        refreshing={refreshing}
-        onRefresh={() => {
-          setRefreshing(true);
-          loadMessages(1, false);
-        }}
+        onStartReached={loadMoreMessages}
+        onStartReachedThreshold={0.5}
+        ListHeaderComponent={
+          loadingMore ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color={Theme.colors.primary} />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubble-outline" size={60} color={Theme.colors.textSecondary} />
             <Text style={styles.emptyText}>No messages yet</Text>
-            <Text style={styles.emptySubtext}>Start the conversation!</Text>
+            <Text style={styles.emptySubtext}>
+              Send a message to start the conversation!
+            </Text>
           </View>
         }
+        onContentSizeChange={() => {
+          if (!loadingMore) scrollToBottom();
+        }}
+        showsVerticalScrollIndicator={false}
       />
 
       {/* Input Area */}
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputContainer, keyboardVisible && styles.inputContainerKeyboard]}>
+        <TouchableOpacity style={styles.attachButton}>
+          <Ionicons name="attach" size={24} color={Theme.colors.textSecondary} />
+        </TouchableOpacity>
+        
         <TextInput
           style={styles.textInput}
           placeholder="Type a message..."
@@ -284,13 +434,15 @@ export default function ChatScreen({ route, navigation }) {
           value={inputText}
           onChangeText={setInputText}
           multiline
-          maxHeight={100}
-          onSubmitEditing={handleSend}
-          blurOnSubmit={false}
+          maxLength={1000}
+          returnKeyType="default"
         />
         
         <TouchableOpacity
-          style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]}
+          style={[
+            styles.sendButton, 
+            (!inputText.trim() || sending) && styles.sendButtonDisabled
+          ]}
           onPress={handleSend}
           disabled={!inputText.trim() || sending}
         >
@@ -315,30 +467,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    marginTop: 10,
+    color: Theme.colors.textSecondary,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingHorizontal: 15,
     paddingBottom: 15,
-    backgroundColor: 'rgba(20, 27, 45, 0.95)',
+    backgroundColor: 'rgba(20, 27, 45, 0.98)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
-    padding: 5,
+    padding: 8,
+    marginRight: 8,
   },
   headerContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 10,
   },
   headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     marginRight: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   headerInfo: {
     flex: 1,
@@ -348,49 +505,76 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Theme.colors.text,
   },
+  headerStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  wsIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4CAF50',
+    marginRight: 6,
+  },
   headerStatus: {
-    fontSize: 13,
+    fontSize: 12,
     color: Theme.colors.textSecondary,
+    marginTop: 2,
   },
   moreButton: {
-    padding: 5,
+    padding: 8,
   },
   messagesList: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    flexGrow: 1,
+  },
+  loadingMore: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  timestampDivider: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    marginVertical: 16,
   },
   messageContainer: {
-    marginVertical: 4,
+    marginVertical: 2,
     flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   ownMessageContainer: {
     justifyContent: 'flex-end',
   },
   otherMessageContainer: {
     justifyContent: 'flex-start',
-    alignItems: 'flex-end',
   },
   messageAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     marginRight: 8,
-    marginTop: 2,
   },
   messageBubble: {
     maxWidth: '75%',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 18,
+    borderRadius: 20,
   },
   messageBubbleWithoutAvatar: {
-    marginLeft: 44,
+    marginLeft: 40,
   },
   ownMessageBubble: {
     backgroundColor: Theme.colors.primary,
+    borderBottomRightRadius: 4,
   },
   otherMessageBubble: {
     backgroundColor: 'rgba(255,255,255,0.1)',
+    borderBottomLeftRadius: 4,
+  },
+  sendingBubble: {
+    opacity: 0.7,
   },
   messageText: {
     fontSize: 16,
@@ -406,12 +590,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
+    justifyContent: 'flex-end',
   },
   messageTime: {
-    fontSize: 12,
+    fontSize: 10,
   },
   ownMessageTime: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.6)',
   },
   otherMessageTime: {
     color: Theme.colors.textSecondary,
@@ -420,9 +605,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   editedLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontStyle: 'italic',
-    color: Theme.colors.textSecondary,
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 2,
   },
   emptyContainer: {
@@ -434,36 +619,46 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     color: Theme.colors.text,
-    marginBottom: 8,
+    marginTop: 16,
+    fontWeight: '600',
   },
   emptySubtext: {
     fontSize: 14,
     color: Theme.colors.textSecondary,
+    marginTop: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(20, 27, 45, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(20, 27, 45, 0.98)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  inputContainerKeyboard: {
+    paddingBottom: Platform.OS === 'ios' ? 12 : 12,
+  },
+  attachButton: {
+    padding: 8,
+    marginRight: 8,
   },
   textInput: {
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 12,
     fontSize: 16,
     color: Theme.colors.text,
-    maxHeight: 100,
+    maxHeight: 120,
     marginRight: 10,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',

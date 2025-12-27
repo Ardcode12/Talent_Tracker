@@ -69,6 +69,7 @@ class User(Base):
     posts = relationship("Post", back_populates="user", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
     liked_posts = relationship("Post", secondary=post_likes, back_populates="liked_by")
+
     performance_data = relationship("PerformanceData", back_populates="user", cascade="all, delete-orphan")
 
     # ✅ Add assessments relationship
@@ -82,8 +83,6 @@ class User(Base):
         secondaryjoin=(connections.c.connected_user_id == id),
         backref="connections_received"
     )
-
-# Add to backend/models.py after the existing tables
 
 class Conversation(Base):
     __tablename__ = "conversations"
@@ -116,7 +115,7 @@ class Message(Base):
     __tablename__ = "messages"
     
     id = Column(Integer, primary_key=True, index=True)
-    conversation_id = Column(Integer, ForeignKey('conversations.id'))
+    conversation_id = Column(Integer, ForeignKey('conversations.id'), index=True)
     sender_id = Column(Integer, ForeignKey('users.id'))
     
     # Message content
@@ -137,20 +136,6 @@ class Message(Base):
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("User", foreign_keys=[sender_id])
 
-
-# Add to User model relationships
-# In the User class, add these relationships:
-# conversations_initiated = relationship(
-#     "Conversation",
-#     foreign_keys="Conversation.user1_id",
-#     back_populates="user1"
-# )
-# conversations_received = relationship(
-#     "Conversation",
-#     foreign_keys="Conversation.user2_id",
-#     back_populates="user2"
-# )
-# sent_messages = relationship("Message", foreign_keys="Message.sender_id")
 
 class Post(Base):
     __tablename__ = "posts"
@@ -203,7 +188,7 @@ class Announcement(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255))
     description = Column(Text)
-    icon = Column(String(10), default="📢") # Corrected emoji: originally 'ðŸ“¢'
+    icon = Column(String(10), default="📢") # Corrected emoji
     link = Column(String(500), nullable=True)
     priority = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)

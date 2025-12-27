@@ -34,6 +34,7 @@ const { width, height } = Dimensions.get("window");
 type RootStackParamList = {
   Login: undefined;
   Main: undefined;
+  CoachMain: undefined;  // ✅ ADD THIS
   ProfileCompletion: undefined;
 };
 
@@ -181,17 +182,23 @@ const AnimatedAuthScreen = () => {
       }
     } else {
       // SIGNUP FLOW
-      const signupData = {
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
-        phone: formData.phone,
-        role: userType, // 'athlete' or 'coach'
-        sport: formData.sport,
-        experience: userType === 'coach' ? formData.experience : null,
-        specialization: userType === 'coach' ? formData.sport : null
-      };
-      
+      // frontend/screens/LoginScreen.tsx
+// Inside handleAuth function, update the signupData object:
+
+// SIGNUP FLOW
+const signupData = {
+  email: formData.email,
+  password: formData.password,
+  name: formData.name,
+  phone: formData.phone,
+  role: userType, // 'athlete' or 'coach'
+  sport: formData.sport,
+  // ✅ FIX: Convert experience to integer or null
+  experience: userType === 'coach' && formData.experience 
+    ? parseInt(formData.experience, 10) 
+    : null,
+  specialization: userType === 'coach' ? formData.sport : null
+};
       response = await ApiService.signup(signupData);
       
       if (response && response.token) {

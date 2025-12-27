@@ -11,7 +11,7 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     role: Optional[str] = None
     sport: Optional[str] = None
-    experience: Optional[str] = None
+    experience: Optional[int] = None  # ✅ Changed from str to int
     specialization: Optional[str] = None
 
 

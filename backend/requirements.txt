@@ -1,15 +1,26 @@
+# --- Core FastAPI Framework ---
 fastapi==0.115.0
-uvicorn==0.30.6
-sqlalchemy==2.0.34
+uvicorn[standard]==0.30.6
 pydantic==2.9.2
-python-jose[cryptography]
-passlib[bcrypt]
-python-multipart
-psycopg2-binary==2.9.9
-python-dotenv==1.0.0
-# Add these if not already present
-python-multipart
+python-multipart==0.0.9
 aiofiles
-mediapipe>=0.9.0
-opencv-python>=4.5.0
 
+# --- Database ---
+sqlalchemy==2.0.34
+psycopg2-binary==2.9.9
+
+# --- Authentication & Security ---
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+
+# --- Machine Learning & Data Processing ---
+numpy==1.26.4
+pandas==2.2.3
+opencv-python==4.10.0.84
+tensorflow==2.16.1
+mediapipe==0.10.14
+joblib==1.4.2
+
+# --- Utilities ---
+python-dotenv==1.0.0
+bcrypt==4.1.2

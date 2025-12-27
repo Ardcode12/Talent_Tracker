@@ -1,0 +1,14 @@
+{
+    "vertical": {
+        "min_hip_angle_land": 90,
+        "max_hip_angle_takeoff": 170,
+        "min_knee_angle_land": 90,
+        "max_knee_angle_takeoff": 170,
+        "min_ankle_angle_takeoff": 90,
+        "body_height_factor": 0.8,
+        "min_jump_frames": 10
+    },
+    "broad": {
+        "example_config": "values_here"
+    }
+}

@@ -1,79 +1,92 @@
+# backend/ml_models/shuttle_run/assessment/agility_analyzer.py
+
 import cv2
 import numpy as np
-import math
+import mediapipe as mp
+from typing import Dict, Any
 
-def analyze_agility(video_path: str, calibration: dict):
+def analyze_agility(video_path: str, calibration: Dict[str, float]) -> Dict[str, Any]:
     """
-    Analyze an agility/shuttle run video and return features.
+    Analyzes agility from a video by tracking movement and detecting turns.
+    
+    Args:
+        video_path: Path to the video file.
+        calibration: Dictionary containing 'distance_m' for the shuttle run.
+
+    Returns:
+        A dictionary with agility metrics.
     """
+    distance_m = calibration.get("distance_m", 10.0)
+    
+    mp_pose = mp.solutions.pose
+    pose = mp_pose.Pose(static_image_mode=False, model_complexity=1, min_detection_confidence=0.5)
+
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        return {
-            "splits": [],
-            "total_time": 0.0,
-            "speeds": [],
-            "accelerations": [],
-        }
+        return {"success": False, "error": "Cannot open video file"}
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    total_time = frame_count / fps
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not fps or fps == 0:
+        fps = 30  # Default FPS
 
-    # Dummy feature extraction: replace with real CV logic
-    distance_m = calibration.get("distance_m", 10.0)
-    num_turns = 4
-    avg_speed = (distance_m * num_turns) / total_time if total_time > 0 else 0.0
-    splits = [total_time / num_turns] * num_turns
-    accelerations = [0.5] * num_turns  # placeholder
-    speeds = [avg_speed] * num_turns
+    positions_x = []
+    timestamps = []
+    frame_count = 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        results = pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        if results.pose_landmarks:
+            landmarks = results.pose_landmarks.landmark
+            left_hip = landmarks[mp_pose.PoseLandmark.LEFT_HIP]
+            right_hip = landmarks[mp_pose.PoseLandmark.RIGHT_HIP]
+            
+            # Use hip average as center of mass for horizontal position
+            center_x = (left_hip.x + right_hip.x) / 2.0
+            positions_x.append(center_x)
+            timestamps.append(frame_count / fps)
+        
+        frame_count += 1
+
+    cap.release()
+    pose.close()
+
+    if len(positions_x) < fps:  # Require at least 1 second of tracking
+        return {"success": False, "error": "Not enough valid motion detected"}
+
+    # Detect turns by finding peaks and troughs in horizontal movement
+    positions_x = np.array(positions_x)
+    velocities_x = np.diff(positions_x) / np.diff(timestamps)
+    
+    # A turn is where velocity changes sign
+    turns = np.where(np.diff(np.sign(velocities_x)))[0] + 1
+    
+    if len(turns) < 1:
+        return {"success": False, "error": "No turns were detected"}
+
+    turn_times = [timestamps[i] for i in turns]
+    splits = np.diff([timestamps[0]] + turn_times + [timestamps[-1]]).tolist()
+    
+    total_time = timestamps[-1] - timestamps[0]
+    num_turns = len(turns)
+    
+    # Calculate speeds and accelerations
+    avg_speed = (distance_m * num_turns) / max(total_time, 0.1)
+    speeds = [distance_m / s for s in splits if s > 0]
+    
+    accelerations = np.abs(np.diff(velocities_x) / np.diff(timestamps[:-1]))
+    peak_accel = np.max(accelerations) if len(accelerations) > 0 else 0
 
     return {
-        "splits": splits,
+        "success": True,
         "total_time": total_time,
-        "speeds": speeds,
-        "accelerations": accelerations,
         "num_turns": num_turns,
         "avg_speed": avg_speed,
+        "peak_accel": float(peak_accel),
+        "splits": splits,
+        "speeds": speeds,
         "fps": fps
     }
-
-
-def compute_score(times_arr, peaks, v, a, dt, fps, x_m, px_per_m):
-    """
-    Compute shuttle run score based on time splits, speed, and acceleration.
-    Returns 0-100 score and metadata.
-    """
-    turn_times = times_arr[peaks] if len(peaks) > 0 else np.array([0.0])
-    splits = list(np.diff(turn_times))[:8] if len(turn_times) >= 2 else [total_time := times_arr[-1]] * 4
-    total_time = np.nansum(splits)
-
-    mean_speed = np.nanmean(np.abs(v)) if len(v) > 0 else 0.0
-    peak_accel = np.nanmax(np.abs(a)) if len(a) > 0 else 0.0
-    avg_split = np.nanmean(splits) if len(splits) > 0 else float('nan')
-
-    # Compose final score (lower time -> higher score)
-    expected_best = 2.5 * 4
-    expected_worst = 8.0 * 4
-    t_norm = (total_time - expected_best) / (expected_worst - expected_best)
-    t_norm = np.clip(t_norm, 0, 1)
-    accel_bonus = np.tanh(peak_accel / 5.0)
-    turn_factor = 1.0 - np.clip((avg_split - 2.0) / 6.0, 0, 1) if not math.isnan(avg_split) else 0.0
-
-    score = (1 - t_norm) * 70 + accel_bonus * 20 + turn_factor * 10
-    score = float(np.clip(score, 0, 100))
-
-    result = {
-        'present': True,
-        'splits': splits,
-        'total_time': float(total_time),
-        'mean_speed_m_s': float(mean_speed),
-        'peak_accel_m_s2': float(peak_accel),
-        'score_0_100': score,
-        'meta': {
-            'fps': float(round(1.0 / np.mean(dt) if len(dt) else fps, 2)),
-            'n_position_samples': int(len(x_m)),
-            'calibration_px_per_m': float(px_per_m),
-        },
-    }
-
-    return result

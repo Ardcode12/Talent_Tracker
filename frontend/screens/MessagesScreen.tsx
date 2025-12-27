@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// frontend/screens/MessagesScreen.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,14 +11,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Theme } from '../constants/Theme';
 import {
   getConversations,
-  startConversation,
   getUnreadCount,
+  getImageUrl,
 } from '../services/api';
 
 export default function MessagesScreen({ navigation }) {
@@ -27,15 +28,19 @@ export default function MessagesScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadTotal, setUnreadTotal] = useState(0);
 
-  useEffect(() => {
-    loadConversations();
-    checkUnreadCount();
-  }, []);
+  // Reload when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadConversations();
+      checkUnreadCount();
+    }, [])
+  );
 
   const loadConversations = async () => {
     try {
       setLoading(true);
       const response = await getConversations();
+      console.log('Conversations response:', response);
       setConversations(response.data || []);
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -46,8 +51,12 @@ export default function MessagesScreen({ navigation }) {
   };
 
   const checkUnreadCount = async () => {
-    const count = await getUnreadCount();
-    setUnreadTotal(count);
+    try {
+      const count = await getUnreadCount();
+      setUnreadTotal(count);
+    } catch (error) {
+      console.error('Error checking unread count:', error);
+    }
   };
 
   const onRefresh = () => {
@@ -57,7 +66,7 @@ export default function MessagesScreen({ navigation }) {
   };
 
   const filteredConversations = conversations.filter(conv =>
-    conv.other_user.name.toLowerCase().includes(searchQuery.toLowerCase())
+    conv.other_user?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const formatLastMessageTime = (dateString) => {
@@ -79,17 +88,31 @@ export default function MessagesScreen({ navigation }) {
     return date.toLocaleDateString();
   };
 
+  const navigateToChat = (item) => {
+    navigation.navigate('ChatScreen', { 
+      conversationId: item.id,
+      otherUser: {
+        id: item.other_user.id,
+        name: item.other_user.name,
+        profile_photo: item.other_user.profile_photo,
+        profilePhoto: item.other_user.profile_photo, // Support both naming conventions
+        sport: item.other_user.sport,
+        role: item.other_user.role,
+        is_online: item.is_online
+      }
+    });
+  };
+
   const renderConversation = ({ item }) => (
     <TouchableOpacity
       style={styles.conversationItem}
-      onPress={() => navigation.navigate('ChatScreen', { 
-        conversationId: item.id,
-        otherUser: item.other_user
-      })}
+      onPress={() => navigateToChat(item)}
     >
       <View style={styles.avatarContainer}>
         <Image
-          source={{ uri: item.other_user.profile_photo || 'https://via.placeholder.com/50' }}
+          source={{ 
+            uri: item.other_user?.profile_photo || 'https://via.placeholder.com/50' 
+          }}
           style={styles.avatar}
         />
         {item.is_online && <View style={styles.onlineIndicator} />}
@@ -97,7 +120,7 @@ export default function MessagesScreen({ navigation }) {
       
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
-          <Text style={styles.userName}>{item.other_user.name}</Text>
+          <Text style={styles.userName}>{item.other_user?.name || 'Unknown'}</Text>
           {item.last_message_at && (
             <Text style={styles.timestamp}>
               {formatLastMessageTime(item.last_message_at)}
@@ -117,22 +140,25 @@ export default function MessagesScreen({ navigation }) {
           </Text>
           {item.unread_count > 0 && (
             <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{item.unread_count}</Text>
+              <Text style={styles.unreadCount}>
+                {item.unread_count > 99 ? '99+' : item.unread_count}
+              </Text>
             </View>
           )}
         </View>
         
         <Text style={styles.userRole}>
-          {item.other_user.role === 'coach' ? 'Coach' : 'Athlete'} • {item.other_user.sport}
+          {item.other_user?.role === 'coach' ? '🏆 Coach' : '🏃 Athlete'} • {item.other_user?.sport || 'Sport'}
         </Text>
       </View>
     </TouchableOpacity>
   );
 
-  if (loading) {
+  if (loading && conversations.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading conversations...</Text>
       </View>
     );
   }
@@ -159,6 +185,11 @@ export default function MessagesScreen({ navigation }) {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color={Theme.colors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Conversations List */}
@@ -167,21 +198,34 @@ export default function MessagesScreen({ navigation }) {
         renderItem={renderConversation}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor={Theme.colors.primary}
+          />
         }
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          filteredConversations.length === 0 && styles.emptyListContent
+        ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons 
               name="chatbubbles-outline" 
-              size={64} 
+              size={80} 
               color={Theme.colors.textSecondary} 
             />
             <Text style={styles.emptyText}>No conversations yet</Text>
             <Text style={styles.emptySubtext}>
-              Start a conversation with an {' '}
-              {navigation.getState().routes[0].params?.userRole === 'coach' ? 'athlete' : 'athlete or coach'}
+              Connect with athletes and coaches to start messaging
             </Text>
+            <TouchableOpacity 
+              style={styles.startButton}
+              onPress={() => navigation.navigate('NewMessage')}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+              <Text style={styles.startButtonText}>Start a Conversation</Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -206,6 +250,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Theme.colors.background,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: Theme.colors.textSecondary,
+    fontSize: 14,
   },
   header: {
     flexDirection: 'row',
@@ -223,8 +273,8 @@ const styles = StyleSheet.create({
   totalUnreadBadge: {
     backgroundColor: Theme.colors.primary,
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   totalUnreadText: {
     color: '#fff',
@@ -239,7 +289,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 15,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
@@ -250,26 +300,30 @@ const styles = StyleSheet.create({
     color: Theme.colors.text,
   },
   listContent: {
-    paddingBottom: 80,
+    paddingBottom: 100,
+  },
+  emptyListContent: {
+    flexGrow: 1,
   },
   conversationItem: {
     flexDirection: 'row',
-    padding: 15,
+    padding: 16,
     marginHorizontal: 20,
-    marginVertical: 5,
+    marginVertical: 6,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: 12,
+    marginRight: 14,
   },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   onlineIndicator: {
     position: 'absolute',
@@ -278,12 +332,13 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: Theme.colors.success,
+    backgroundColor: '#4CAF50',
     borderWidth: 2,
     borderColor: Theme.colors.background,
   },
   conversationContent: {
     flex: 1,
+    justifyContent: 'center',
   },
   conversationHeader: {
     flexDirection: 'row',
@@ -308,7 +363,7 @@ const styles = StyleSheet.create({
   },
   lastMessage: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: Theme.colors.textSecondary,
     marginRight: 8,
   },
@@ -318,53 +373,70 @@ const styles = StyleSheet.create({
   },
   unreadBadge: {
     backgroundColor: Theme.colors.primary,
-    width: 24,
+    minWidth: 24,
     height: 24,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 6,
   },
   unreadCount: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   userRole: {
-    fontSize: 13,
+    fontSize: 12,
     color: Theme.colors.textSecondary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 100,
+    paddingHorizontal: 40,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: Theme.colors.text,
-    marginTop: 16,
+    marginTop: 20,
   },
   emptySubtext: {
     fontSize: 14,
     color: Theme.colors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
+    lineHeight: 20,
+  },
+  startButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 24,
+  },
+  startButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   fab: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: 24,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: Theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
 });

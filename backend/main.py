@@ -9,35 +9,40 @@ from datetime import datetime
 import traceback
 import os
 
-# Import top-level modules (these are directly in the 'backend' directory)
+# Import modules from current directory (backend)
 import models
 import schemas
 import crud
 from database import get_db, engine
 
-# Import core components (these are in 'backend/core')
-from core.config import UPLOAD_DIR # Absolute import from backend.core
+# Import core components
+from core.config import UPLOAD_DIR
 
-# Import API routers (these are in 'backend/api')
-from api import auth, users, assessments, connections, posts, coaches, messaging, admin
+# Import API routers
+from api import auth, users, assessments, connections, posts, coaches, messaging, admin, message_ws
+from api import notifications, search, rankings 
 
-# Load environment variables (e.g., from .env)
+# Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
-# Create database tables (should only run once)
-try:
-    models.Base.metadata.create_all(bind=engine)
-    print("Database tables created/updated successfully.")
-except Exception as e:
-    print(f"Database initialization error: {e}")
-    # Consider raising the exception or handling it as needed
-    # raise e 
+# Database initialization (commented out drop_all)
+# print("Attempting database schema creation/update...")
+# try:
+#     # Ensure models.Base.metadata.drop_all is COMMENTED OUT or REMOVED
+#     # The database has been manually wiped. Now just create.
+#     # models.Base.metadata.drop_all(bind=engine) # <--- THIS LINE MUST BE COMMENTED OUT or REMOVED
+#     models.Base.metadata.create_all(bind=engine) # <--- THIS LINE MUST BE UNCOMMENTED
+#     print("Database tables created/updated successfully.")
+# except Exception as e:
+#     print(f"Database initialization error: {e}")
+#     print(traceback.format_exc()) # Print full traceback to console
+#     raise e # Re-raise the exception to clearly show it in Uvicorn logs
 
 # Create FastAPI app
 app = FastAPI(title="TalentTracker API", version="1.0.0")
 
-# CORS Middleware Configuration (from your original main.py)
+# CORS Middleware Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -65,6 +70,10 @@ app.include_router(posts.router)
 app.include_router(coaches.router)
 app.include_router(messaging.router)
 app.include_router(admin.router)
+app.include_router(message_ws.router)
+app.include_router(notifications.router)  # ADD
+app.include_router(search.router)         # ADD
+app.include_router(rankings.router)       # ADD
 
 # ===========================
 # General / Root Endpoints
@@ -187,7 +196,7 @@ def old_admin_dashboard(db: Session = Depends(get_db)):
         </head>
         <body>
             <div class="container">
-                <h1>🏆 TalentTracker Admin Dashboard</h1> 
+                <h1>ðŸ† TalentTracker Admin Dashboard</h1> 
                 
                 <div class="stats">
                     <div class="stat-card">
@@ -231,7 +240,7 @@ def old_admin_dashboard(db: Session = Depends(get_db)):
         ai_score = getattr(user, 'ai_score', None)
         ai_score_info = f"{ai_score}%" if ai_score else '<span class="empty">-</span>'
         is_verified = getattr(user, 'is_verified', False)
-        verified_info = '<span class="verified">✓</span>' if is_verified else '<span class="empty">✗</span>' # Corrected emoji: originally 'âœ“', 'âœ—'
+        verified_info = '<span class="verified">âœ“</span>' if is_verified else '<span class="empty">âœ—</span>'
         
         profile_img_html = '<span class="empty">No photo</span>'
         if user.profile_image:
@@ -268,4 +277,3 @@ def old_admin_dashboard(db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

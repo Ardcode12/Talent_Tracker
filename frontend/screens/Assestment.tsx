@@ -217,26 +217,33 @@ export default function AssessmentScreen() {
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <Text style={styles.headerTitle}>AI Assessments</Text>
-      <Text style={styles.headerSubtitle}>Track Your Athletic Performance</Text>
-      {stats ? (
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.total_assessments || 0}</Text>
-            <Text style={styles.statLabel}>Total Tests</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {stats.average_score ? `${stats.average_score.toFixed(1)}%` : 'N/A'}
-            </Text>
-            <Text style={styles.statLabel}>Avg Score</Text>
-          </View>
+  <View style={styles.header}>
+    <Text style={styles.headerTitle}>AI Assessments</Text>
+    <Text style={styles.headerSubtitle}>Track Your Athletic Performance</Text>
+    {stats ? (
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{stats.total_assessments || 0}</Text>
+          <Text style={styles.statLabel}>Total Tests</Text>
         </View>
-      ) : null}
-    </View>
-  );
-
+        <View style={styles.statCard}>
+          {/* Average of ALL scores - for Assessment page */}
+          <Text style={styles.statValue}>
+            {stats.average_score ? `${stats.average_score.toFixed(1)}%` : 'N/A'}
+          </Text>
+          <Text style={styles.statLabel}>Avg Score</Text>
+        </View>
+        <View style={styles.statCard}>
+          {/* Average of BEST scores - used for ranking */}
+          <Text style={styles.statValue}>
+            {stats.current_ai_score ? `${stats.current_ai_score.toFixed(1)}%` : 'N/A'}
+          </Text>
+          <Text style={styles.statLabel}>Rank Score</Text>
+        </View>
+      </View>
+    ) : null}
+  </View>
+);
   const renderTestCard = ({ item }) => (
     <TouchableOpacity 
       style={styles.testCard} 

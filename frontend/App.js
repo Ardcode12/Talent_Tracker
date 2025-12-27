@@ -1,11 +1,13 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿// frontend/App.js - COMPLETE REPLACEMENT
+
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { getUnreadCount } from './services/api';
 
 // Import your screens
@@ -13,31 +15,41 @@ import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
 import ExploreScreen from './screens/Assestment';
 import ConnectionsScreen from './screens/ConnectionsScreen';
-import OpportunitiesScreen from './screens/OpportunitiesScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import ProfileCompletionScreen from './screens/ProfileCompletionScreen';
 import CreatePostScreen from './screens/CreatePostScreen';
 import CoachDashboard from './screens/CoachDashboard';
 import CoachAssessments from './screens/CoachAssessments';
+import CoachProfileScreen from './screens/CoachProfileScreen';
 import MessagesScreen from './screens/MessagesScreen';
 import ChatScreen from './screens/ChatScreen';
 import NewMessageScreen from './screens/NewMessageScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Athlete Tab Navigator
+// ============================================
+// OWN PROFILE SCREEN - NEVER RECEIVES userId PARAM
+// ============================================
+function OwnProfileScreen() {
+  // This component explicitly passes NO userId, forcing ProfileScreen to show current user
+  return <ProfileScreen />;
+}
+
+function OwnCoachProfileScreen() {
+  return <CoachProfileScreen />;
+}
+
+// ============================================
+// ATHLETE TAB NAVIGATOR
+// ============================================
 function AthleteTabNavigator() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    // Check unread count initially
     checkUnreadMessages();
-    
-    // Set up interval to check periodically
-    const interval = setInterval(checkUnreadMessages, 30000); // Check every 30 seconds
-    
-    // Clean up interval on unmount
+    const interval = setInterval(checkUnreadMessages, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -55,7 +67,6 @@ function AthleteTabNavigator() {
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-
           switch (route.name) {
             case 'Home':
               iconName = focused ? 'home' : 'home-outline';
@@ -75,7 +86,6 @@ function AthleteTabNavigator() {
             default:
               iconName = 'alert-circle-outline';
           }
-
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#007AFF',
@@ -107,31 +117,24 @@ function AthleteTabNavigator() {
       <Tab.Screen 
         name="Messages" 
         component={MessagesScreen}
-        listeners={{
-          tabPress: () => {
-            // Refresh unread count when messages tab is pressed
-            checkUnreadMessages();
-          },
-        }}
+        listeners={{ tabPress: () => checkUnreadMessages() }}
       />
       <Tab.Screen name="Connections" component={ConnectionsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      {/* USE OwnProfileScreen - NOT ProfileScreen */}
+      <Tab.Screen name="Profile" component={OwnProfileScreen} />
     </Tab.Navigator>
   );
 }
 
-// Coach Tab Navigator
+// ============================================
+// COACH TAB NAVIGATOR
+// ============================================
 function CoachTabNavigator() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    // Check unread count initially
     checkUnreadMessages();
-    
-    // Set up interval to check periodically
-    const interval = setInterval(checkUnreadMessages, 30000); // Check every 30 seconds
-    
-    // Clean up interval on unmount
+    const interval = setInterval(checkUnreadMessages, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -149,7 +152,6 @@ function CoachTabNavigator() {
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-
           switch (route.name) {
             case 'Dashboard':
               iconName = focused ? 'speedometer' : 'speedometer-outline';
@@ -169,10 +171,9 @@ function CoachTabNavigator() {
             default:
               iconName = 'alert-circle-outline';
           }
-
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#667eea',
+        tabBarActiveTintColor: '#2c3e50',
         tabBarInactiveTintColor: '#8E8E93',
         tabBarStyle: {
           backgroundColor: '#1a1a1a',
@@ -202,21 +203,24 @@ function CoachTabNavigator() {
       <Tab.Screen 
         name="Messages" 
         component={MessagesScreen}
-        listeners={{
-          tabPress: () => {
-            // Refresh unread count when messages tab is pressed
-            checkUnreadMessages();
-          },
-        }}
+        listeners={{ tabPress: () => checkUnreadMessages() }}
       />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      {/* USE OwnCoachProfileScreen - NOT CoachProfileScreen */}
+      <Tab.Screen name="Profile" component={OwnCoachProfileScreen} />
     </Tab.Navigator>
   );
 }
 
+// ============================================
+// MAIN APP
+// ============================================
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Login');
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
 
   const checkAuthStatus = async () => {
     try {
@@ -227,8 +231,6 @@ export default function App() {
         AsyncStorage.getItem('userData'),
         AsyncStorage.getItem('userRole')
       ]);
-      
-      console.log('Auth check - Role:', userRole);
       
       if (isLoggedIn === 'true' && token !== null) {
         let user = null;
@@ -250,8 +252,6 @@ export default function App() {
 
         if (isProfileComplete || profileCompleted === 'true' || userSpecificFlag === 'true' || profileCompleted === 'skipped') {
           const role = userRole || (user && user.role);
-          console.log('Navigating based on role:', role);
-          
           if (role === 'coach') {
             setInitialRoute('CoachMain');
           } else {
@@ -271,10 +271,6 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
   if (isLoading) {
     return (
       <SafeAreaProvider>
@@ -293,190 +289,38 @@ export default function App() {
           screenOptions={{
             headerShown: false,
             cardStyle: { backgroundColor: '#000' },
-            animationEnabled: true,
-            gestureEnabled: true,
           }}
         >
-          <Stack.Screen 
-            name="Login" 
-            component={LoginScreen}
-            options={{
-              animationTypeForReplace: 'push',
-            }}
-          />
-          <Stack.Screen 
-            name="ProfileCompletion" 
-            component={ProfileCompletionScreen}
-            options={{
-              animationTypeForReplace: 'push',
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen 
-            name="Main" 
-            component={AthleteTabNavigator}
-            options={{
-              animationEnabled: false,
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen 
-            name="CoachMain" 
-            component={CoachTabNavigator}
-            options={{
-              animationEnabled: false,
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen 
-            name="CreatePost" 
-            component={CreatePostScreen}
-            options={{
-              animation: 'slide_from_bottom',
-              presentation: 'modal',
-              headerShown: false,
-              gestureEnabled: true,
-              cardOverlayEnabled: true,
-              cardStyleInterpolator: ({ current: { progress } }) => ({
-                cardStyle: {
-                  opacity: progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 1],
-                  }),
-                },
-                overlayStyle: {
-                  opacity: progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 0.5],
-                    extrapolate: 'clamp',
-                  }),
-                },
-              }),
-            }}
-          />
+          {/* AUTH */}
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="ProfileCompletion" component={ProfileCompletionScreen} />
           
-          {/* Messaging Screens */}
-          <Stack.Screen 
-            name="ChatScreen" 
-            component={ChatScreen}
-            options={{
-              headerShown: false,
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen 
-            name="NewMessage" 
-            component={NewMessageScreen}
-            options={{
-              title: 'New Message',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
-              headerTintColor: '#fff',
-              presentation: 'modal',
-            }}
-          />
+          {/* MAIN TABS */}
+          <Stack.Screen name="Main" component={AthleteTabNavigator} />
+          <Stack.Screen name="CoachMain" component={CoachTabNavigator} />
           
-          {/* Other screens */}
+          {/* ============================================ */}
+          {/* OTHER USER PROFILE - THIS IS THE KEY SCREEN */}
+          {/* ============================================ */}
           <Stack.Screen 
-            name="TrendingAthletes" 
-            component={ExploreScreen}
-            options={{
-              title: 'Trending Athletes',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
-              headerTintColor: '#fff',
-            }}
-          />
-          <Stack.Screen 
-            name="AnnouncementDetail" 
-            component={ExploreScreen}
-            options={{
-              title: 'Announcement',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
-              headerTintColor: '#fff',
-            }}
-          />
-          <Stack.Screen 
-            name="Comments" 
-            component={ExploreScreen}
-            options={{
-              title: 'Comments',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
-              headerTintColor: '#fff',
-            }}
-          />
-          <Stack.Screen 
-            name="Assessment" 
-            component={ExploreScreen}
-            options={{
-              title: 'AI Assessment',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
-              headerTintColor: '#fff',
-            }}
-          />
-          <Stack.Screen 
-            name="UploadVideo" 
-            component={ExploreScreen}
-            options={{
-              title: 'Upload Video',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
-              headerTintColor: '#fff',
-            }}
-          />
-          <Stack.Screen 
-            name="ViewReports" 
-            component={ExploreScreen}
-            options={{
-              title: 'Performance Reports',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
-              headerTintColor: '#fff',
-            }}
-          />
-          <Stack.Screen 
-            name="LiveAssessment" 
-            component={ExploreScreen}
-            options={{
-              title: 'Live Assessment',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
-              headerTintColor: '#fff',
-            }}
-          />
-          <Stack.Screen 
-            name="Profile" 
+            name="UserProfile" 
             component={ProfileScreen}
-            options={({ route }) => ({
-              title: 'Profile',
+            options={{
               headerShown: true,
-              headerStyle: {
-                backgroundColor: '#1a1a1a',
-              },
+              headerStyle: { backgroundColor: '#1a1a1a' },
               headerTintColor: '#fff',
-              // Allow passing userId to view other profiles
-              ...route.params,
-            })}
+              title: 'Profile',
+            }}
           />
+          
+          {/* OTHER SCREENS */}
+          <Stack.Screen name="CreatePost" component={CreatePostScreen} options={{ presentation: 'modal' }} />
+          <Stack.Screen name="ChatScreen" component={ChatScreen} />
+          <Stack.Screen name="NewMessage" component={NewMessageScreen} options={{ presentation: 'modal' }} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="ConnectionRequests" component={ConnectionsScreen} />
+          <Stack.Screen name="AthleteDetail" component={ProfileScreen} />
+          <Stack.Screen name="Rankings" component={ExploreScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

@@ -1,11 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  getCoachDashboardStats, 
-  getCoachAthletes, 
-  getCoachDashboardFeed,
-  getAssessmentStatistics ,
-  getImageUrl
-} from '../services/api';
+// frontend/screens/CoachDashboard.tsx
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -15,653 +9,696 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
-  FlatList,
-  TextInput,
   Dimensions,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import Animated, { FadeInDown, FadeIn, FadeInRight } from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
 import { Theme } from '../constants/Theme';
+import SearchModal from '../components/SearchModal';
+import {
+  getCoachDashboardStats,
+  getCoachAthletes,
+  getCoachDashboardFeed,
+  getAssessmentStatistics,
+  getUnreadCount,
+  getNotificationCount,
+  getImageUrl,
+  getAllAthletes,
+  getTopAthletes,
+  getActiveAthletes,
+  getRisingStars,
+} from '../services/api';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function CoachDashboard({ navigation }) {
+  // Data States
   const [stats, setStats] = useState(null);
-  const [athletes, setAthletes] = useState([]);
+  const [connectedAthletes, setConnectedAthletes] = useState([]);
+  const [topAthletes, setTopAthletes] = useState([]);
+  const [activeAthletes, setActiveAthletes] = useState([]);
+  const [risingStars, setRisingStars] = useState([]);
   const [athletePosts, setAthletePosts] = useState([]);
   const [assessmentStats, setAssessmentStats] = useState(null);
+  
+  // UI States
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'posts', 'performance'
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  // Load data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboardData();
+      loadCounts();
+    }, [])
+  );
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       
       // Fetch all data in parallel
-      const [statsRes, athletesRes, feedRes, assessmentStatsRes] = await Promise.all([
+      const [
+        statsRes,
+        connectedRes,
+        topAthletesRes,
+        activeAthletesRes,
+        risingStarsRes,
+        feedRes,
+        assessmentStatsRes
+      ] = await Promise.all([
         getCoachDashboardStats(),
         getCoachAthletes({ limit: 10 }),
+        getTopAthletes(10),
+        getActiveAthletes(24, 10),
+        getRisingStars(30, 10),
         getCoachDashboardFeed(1, 5),
-        getAssessmentStatistics()
+        getAssessmentStatistics(),
       ]);
-      
+
+      console.log('Dashboard Stats:', statsRes);
+      console.log('Top Athletes:', topAthletesRes);
+      console.log('Active Athletes:', activeAthletesRes);
+      console.log('Rising Stars:', risingStarsRes);
+
       if (statsRes) setStats(statsRes);
-      if (athletesRes?.data) setAthletes(athletesRes.data);
+      if (connectedRes?.data) setConnectedAthletes(connectedRes.data);
+      if (topAthletesRes?.data) setTopAthletes(topAthletesRes.data);
+      if (activeAthletesRes?.data) setActiveAthletes(activeAthletesRes.data);
+      if (risingStarsRes?.data) setRisingStars(risingStarsRes.data);
       if (feedRes?.data) setAthletePosts(feedRes.data);
       if (assessmentStatsRes) setAssessmentStats(assessmentStatsRes);
       
     } catch (error) {
       console.error('Error loading dashboard:', error);
+      Alert.alert('Error', 'Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const renderPerformanceCard = ({ title, value, subtitle, icon, color }) => (
-    <View style={[styles.performanceCard, { borderLeftColor: color }]}>
-      <View style={styles.performanceCardHeader}>
-        <MaterialIcons name={icon} size={24} color={color} />
-        <Text style={styles.performanceCardTitle}>{title}</Text>
-      </View>
-      <Text style={styles.performanceCardValue}>{value}</Text>
-      {subtitle && <Text style={styles.performanceCardSubtitle}>{subtitle}</Text>}
-    </View>
-  );
+  const loadCounts = async () => {
+    try {
+      const [unread, notifications] = await Promise.all([
+        getUnreadCount(),
+        getNotificationCount(),
+      ]);
+      setUnreadMessages(unread || 0);
+      setNotificationCount(notifications || 0);
+    } catch (error) {
+      console.error('Error loading counts:', error);
+    }
+  };
 
-  const renderTopPerformer = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.topPerformerCard}
-      onPress={() => navigation.navigate('AthleteDetail', { athleteId: item.id })}
-    >
-      <Image
-        source={{ uri: item.profile_photo || 'https://via.placeholder.com/50' }}
-        style={styles.topPerformerPhoto}
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadDashboardData(), loadCounts()]);
+  };
+
+  // Navigate to athlete profile
+  // In CoachDashboard.tsx - Update navigateToAthleteProfile function
+// In CoachDashboard.tsx - Make sure navigation uses 'UserProfile' screen
+
+const navigateToAthleteProfile = (athlete) => {
+  console.log('Navigating to athlete profile:', athlete.id, athlete.name);
+  navigation.navigate('UserProfile', {
+    userId: athlete.id,
+    athlete: athlete
+  });
+};
+
+  // Helper Functions
+  const formatTestTypeName = (testType) => {
+    if (!testType) return '';
+    return testType
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  const getTestTypeColor = (testType) => {
+    const colors = {
+      shuttle_run: '#FF6B6B',
+      vertical_jump: '#4ECDC4',
+      squats: '#45B7D1',
+      height_detection: '#F7DC6F',
+    };
+    return colors[testType] || Theme.colors.primary;
+  };
+
+  // ============================================
+  // RENDER: Dashboard Header
+  // ============================================
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={StyleSheet.absoluteFillObject}
       />
-      <View style={styles.topPerformerInfo}>
-        <Text style={styles.topPerformerName}>{item.name}</Text>
-        <Text style={styles.topPerformerSport}>{item.sport}</Text>
-      </View>
-      <View style={styles.topPerformerScore}>
-        <Text style={styles.topPerformerScoreValue}>{item.average_score}%</Text>
-        <Text style={styles.topPerformerScoreLabel}>Avg Score</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderAthletePost = ({ item }) => (
-    <View style={styles.postCard}>
-      <View style={styles.postHeader}>
-        <Image
-          source={{ uri: item.user.profile_photo || 'https://via.placeholder.com/40' }}
-          style={styles.postUserPhoto}
-        />
-        <View style={styles.postUserInfo}>
-          <Text style={styles.postUserName}>{item.user.name}</Text>
-          <Text style={styles.postMeta}>
-            {item.user.sport} • AI Score: {item.user.ai_score}%
+      
+      <View style={styles.topNav}>
+        <View style={styles.greetingContainer}>
+          <Text style={styles.greetingText}>{getGreeting()},</Text>
+          <Text style={styles.coachNameText}>
+            {stats?.coach_info?.name || 'Coach'} 👋
           </Text>
         </View>
-        {item.is_ai_verified && (
-          <View style={styles.verifiedBadge}>
-            <Ionicons name="shield-checkmark" size={16} color={Theme.colors.success} />
-          </View>
-        )}
-      </View>
-      <Text style={styles.postContent} numberOfLines={3}>
-        {item.content.text}
-      </Text>
-      <View style={styles.postFooter}>
-        <Text style={styles.postTime}>
-          {new Date(item.created_at).toLocaleDateString()}
-        </Text>
-        <View style={styles.postStats}>
-          <Ionicons name="heart" size={16} color={Theme.colors.error} />
-          <Text style={styles.postStatText}>{item.likes_count}</Text>
-          <Ionicons name="chatbubble" size={16} color={Theme.colors.primary} />
-          <Text style={styles.postStatText}>{item.comments_count}</Text>
+        
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => setShowSearchModal(true)}
+          >
+            <Ionicons name="search" size={22} color="#fff" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => navigation.navigate('Notifications')}
+          >
+            <Ionicons name="notifications-outline" size={22} color="#fff" />
+            {(stats?.pending_requests > 0 || notificationCount > 0) && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {(stats?.pending_requests || 0) + notificationCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <Image
+              source={{
+                uri: stats?.coach_info?.profile_photo || 
+                     getImageUrl(stats?.coach_info?.profile_photo) || 
+                     'https://via.placeholder.com/40',
+              }}
+              style={styles.headerAvatar}
+            />
+          </TouchableOpacity>
         </View>
       </View>
-    </View>
-  );
 
-  const renderTabs = () => (
-    <View style={styles.tabContainer}>
-      {['overview', 'posts', 'performance'].map((tab) => (
-        <TouchableOpacity
-          key={tab}
-          style={[styles.tab, activeTab === tab && styles.activeTab]}
-          onPress={() => setActiveTab(tab)}
-        >
-          <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  const renderOverviewContent = () => (
-    <>
-      {/* Quick Actions */}
-      <View style={styles.quickActionsContainer}>
+      {/* Stats Summary Cards */}
+      <Animated.View 
+        entering={FadeInDown.delay(200).duration(500)} 
+        style={styles.statsCardsContainer}
+      >
         <TouchableOpacity 
-          style={styles.quickActionButton}
-          onPress={() => navigation.navigate('CoachAssessments')}
+          style={styles.statsCard}
+          onPress={() => navigation.navigate('Athletes')}
+        >
+          <View style={[styles.statsCardIcon, { backgroundColor: '#667eea20' }]}>
+            <FontAwesome5 name="users" size={20} color="#667eea" />
+          </View>
+          <Text style={styles.statsCardNumber}>
+            {stats?.connected_athletes || 0}
+          </Text>
+          <Text style={styles.statsCardLabel}>Connected</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.statsCard}
+          onPress={() => navigation.navigate('Assessments')}
+        >
+          <View style={[styles.statsCardIcon, { backgroundColor: '#2ecc7120' }]}>
+            <Ionicons name="clipboard-outline" size={22} color="#2ecc71" />
+          </View>
+          <Text style={styles.statsCardNumber}>
+            {stats?.total_assessments || 0}
+          </Text>
+          <Text style={styles.statsCardLabel}>Reviews</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.statsCard}
+          onPress={() => navigation.navigate('ConnectionRequests')}
+        >
+          <View style={[styles.statsCardIcon, { backgroundColor: '#e74c3c20' }]}>
+            <Ionicons name="git-pull-request" size={22} color="#e74c3c" />
+          </View>
+          <Text style={styles.statsCardNumber}>
+            {stats?.pending_requests || 0}
+          </Text>
+          <Text style={styles.statsCardLabel}>Pending</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.statsCard}
+          onPress={() => navigation.navigate('Messages')}
+        >
+          <View style={[styles.statsCardIcon, { backgroundColor: '#3498db20' }]}>
+            <Ionicons name="chatbubbles-outline" size={22} color="#3498db" />
+          </View>
+          <Text style={styles.statsCardNumber}>{unreadMessages}</Text>
+          <Text style={styles.statsCardLabel}>Messages</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+
+  // ============================================
+  // RENDER: Quick Actions
+  // ============================================
+  const renderQuickActions = () => (
+    <Animated.View 
+      entering={FadeInDown.delay(300).duration(500)} 
+      style={styles.section}
+    >
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.quickActionsScroll}
+      >
+        <TouchableOpacity
+          style={styles.quickActionItem}
+          onPress={() => navigation.navigate('Assessments')}
         >
           <LinearGradient
-            colors={Theme.colors.gradient.primary}
+            colors={['#667eea', '#764ba2']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="analytics" size={24} color="#fff" />
-            <Text style={styles.quickActionText}>View All Assessments</Text>
+            <Ionicons name="analytics" size={26} color="#fff" />
           </LinearGradient>
+          <Text style={styles.quickActionLabel}>Assessments</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.quickActionButton}
+
+        <TouchableOpacity
+          style={styles.quickActionItem}
           onPress={() => navigation.navigate('Athletes')}
         >
           <LinearGradient
-            colors={Theme.colors.gradient.secondary}
+            colors={['#11998e', '#38ef7d']}
             style={styles.quickActionGradient}
           >
-            <FontAwesome5 name="users" size={24} color="#fff" />
-            <Text style={styles.quickActionText}>Manage Athletes</Text>
+            <FontAwesome5 name="users" size={22} color="#fff" />
           </LinearGradient>
+          <Text style={styles.quickActionLabel}>My Athletes</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.quickActionItem}
+          onPress={() => setShowSearchModal(true)}
+        >
+          <LinearGradient
+            colors={['#f093fb', '#f5576c']}
+            style={styles.quickActionGradient}
+          >
+            <Ionicons name="search" size={26} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.quickActionLabel}>Find</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.quickActionItem}
+          onPress={() => navigation.navigate('Messages')}
+        >
+          <LinearGradient
+            colors={['#4facfe', '#00f2fe']}
+            style={styles.quickActionGradient}
+          >
+            <Ionicons name="chatbubbles" size={26} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.quickActionLabel}>Messages</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.quickActionItem}
+          onPress={() => navigation.navigate('Notifications')}
+        >
+          <LinearGradient
+            colors={['#ff6b6b', '#ee5a5a']}
+            style={styles.quickActionGradient}
+          >
+            <Ionicons name="notifications" size={26} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.quickActionLabel}>Alerts</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.quickActionItem}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <LinearGradient
+            colors={['#fa709a', '#fee140']}
+            style={styles.quickActionGradient}
+          >
+            <Ionicons name="person" size={26} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.quickActionLabel}>Profile</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </Animated.View>
+  );
+
+  // ============================================
+  // RENDER: Top Performing Athletes (ALL Athletes)
+  // ============================================
+  const renderTopAthletes = () => (
+    <Animated.View 
+      entering={FadeInDown.delay(400).duration(500)} 
+      style={styles.section}
+    >
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleContainer}>
+          <Text style={styles.sectionTitle}>🏆 Top Performing Athletes</Text>
+          <Text style={styles.sectionSubtitle}>Highest AI scores across all sports</Text>
+        </View>
+        <TouchableOpacity onPress={() => setShowSearchModal(true)}>
+          <Text style={styles.seeAllText}>View All</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Recent Athletes */}
+      {topAthletes.length > 0 ? (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.athletesScroll}
+        >
+          {topAthletes.map((athlete, index) => (
+            <Animated.View
+              key={athlete.id}
+              entering={FadeInRight.delay(index * 50).duration(400)}
+            >
+              <TouchableOpacity
+                style={styles.topAthleteCard}
+                onPress={() => navigateToAthleteProfile(athlete)}
+              >
+                {/* Rank Badge */}
+                <View style={[
+                  styles.rankBadge,
+                  { backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : '#667eea' }
+                ]}>
+                  <Text style={styles.rankBadgeText}>#{index + 1}</Text>
+                </View>
+                
+                {/* Profile Photo */}
+                <View style={styles.athletePhotoContainer}>
+                  <Image
+                    source={{ uri: athlete.profile_photo || 'https://via.placeholder.com/70' }}
+                    style={styles.topAthletePhoto}
+                  />
+                  {athlete.is_online && <View style={styles.onlineIndicator} />}
+                  {athlete.is_verified && (
+                    <View style={styles.verifiedBadge}>
+                      <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
+                    </View>
+                  )}
+                </View>
+                
+                {/* Athlete Info */}
+                <Text style={styles.topAthleteName} numberOfLines={1}>
+                  {athlete.name?.split(' ')[0] || 'Athlete'}
+                </Text>
+                
+                {/* AI Score */}
+                <View style={styles.scoreContainer}>
+                  <Text style={styles.scoreValue}>{athlete.ai_score || 0}%</Text>
+                </View>
+                
+                {/* Sport & Location */}
+                <Text style={styles.topAthleteSport} numberOfLines={1}>
+                  {athlete.sport || 'Sport'}
+                </Text>
+                <Text style={styles.topAthleteLocation} numberOfLines={1}>
+                  📍 {athlete.location || 'Location'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={styles.emptyState}>
+          <FontAwesome5 name="trophy" size={40} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyStateText}>No athletes found</Text>
+        </View>
+      )}
+    </Animated.View>
+  );
+
+  // ============================================
+  // RENDER: Active Athletes (Online/Recently Active)
+  // ============================================
+  const renderActiveAthletes = () => (
+    <Animated.View 
+      entering={FadeInDown.delay(500).duration(500)} 
+      style={styles.section}
+    >
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Athletes</Text>
+        <View style={styles.sectionTitleContainer}>
+          <Text style={styles.sectionTitle}>🟢 Active Now</Text>
+          <Text style={styles.sectionSubtitle}>Athletes active in the last 24 hours</Text>
+        </View>
+      </View>
+
+      {activeAthletes.length > 0 ? (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.athletesScroll}
+        >
+          {activeAthletes.map((athlete, index) => (
+            <Animated.View
+              key={athlete.id}
+              entering={FadeInRight.delay(index * 50).duration(400)}
+            >
+              <TouchableOpacity
+                style={styles.activeAthleteCard}
+                onPress={() => navigateToAthleteProfile(athlete)}
+              >
+                <View style={styles.activePhotoContainer}>
+                  <Image
+                    source={{ uri: athlete.profile_photo || 'https://via.placeholder.com/60' }}
+                    style={styles.activeAthletePhoto}
+                  />
+                  <View style={[
+                    styles.statusDot,
+                    { backgroundColor: athlete.is_online ? '#2ecc71' : '#f39c12' }
+                  ]} />
+                </View>
+                
+                <Text style={styles.activeAthleteName} numberOfLines={1}>
+                  {athlete.name?.split(' ')[0]}
+                </Text>
+                
+                <Text style={styles.activeAthleteScore}>
+                  {athlete.ai_score || 0}%
+                </Text>
+                
+                <Text style={styles.activeAthleteSport} numberOfLines={1}>
+                  {athlete.sport || 'Sport'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={styles.emptyStateSmall}>
+          <Ionicons name="people-outline" size={30} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyStateTextSmall}>No active athletes</Text>
+        </View>
+      )}
+    </Animated.View>
+  );
+
+  // ============================================
+  // RENDER: Rising Stars (Biggest Improvements)
+  // ============================================
+  const renderRisingStars = () => {
+    if (risingStars.length === 0) return null;
+
+    return (
+      <Animated.View 
+        entering={FadeInDown.delay(600).duration(500)} 
+        style={styles.section}
+      >
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionTitle}>📈 Rising Stars</Text>
+            <Text style={styles.sectionSubtitle}>Biggest improvements this month</Text>
+          </View>
+        </View>
+
+        {risingStars.slice(0, 5).map((item, index) => (
+          <TouchableOpacity
+            key={item.athlete?.id || index}
+            style={styles.risingStarCard}
+            onPress={() => item.athlete && navigateToAthleteProfile(item.athlete)}
+          >
+            <View style={styles.risingStarRank}>
+              <Text style={styles.risingStarRankText}>{index + 1}</Text>
+            </View>
+            
+            <Image
+              source={{ uri: item.athlete?.profile_photo || 'https://via.placeholder.com/45' }}
+              style={styles.risingStarPhoto}
+            />
+            
+            <View style={styles.risingStarInfo}>
+              <Text style={styles.risingStarName}>{item.athlete?.name}</Text>
+              <Text style={styles.risingStarSport}>{item.athlete?.sport}</Text>
+              <Text style={styles.risingStarProgress}>
+                {item.old_score}% → {item.new_score}%
+              </Text>
+            </View>
+            
+            <View style={styles.improvementBadge}>
+              <Ionicons name="trending-up" size={14} color="#fff" />
+              <Text style={styles.improvementText}>+{item.improvement}%</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </Animated.View>
+    );
+  };
+
+  // ============================================
+  // RENDER: Your Connected Athletes
+  // ============================================
+  const renderConnectedAthletes = () => (
+    <Animated.View 
+      entering={FadeInDown.delay(700).duration(500)} 
+      style={styles.section}
+    >
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleContainer}>
+          <Text style={styles.sectionTitle}>👥 Your Athletes</Text>
+          <Text style={styles.sectionSubtitle}>Athletes connected to you</Text>
+        </View>
         <TouchableOpacity onPress={() => navigation.navigate('Athletes')}>
           <Text style={styles.seeAllText}>See All</Text>
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        horizontal
-        data={athletes.slice(0, 5)}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.athleteCardCompact}
-            onPress={() => navigation.navigate('AthleteDetail', { athleteId: item.id })}
-          >
-            <Image
-              source={{ uri: item.profile_photo || 'https://via.placeholder.com/60' }}
-              style={styles.athletePhotoCompact}
-            />
-            <Text style={styles.athleteNameCompact} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <Text style={styles.athleteScoreCompact}>{item.ai_score}%</Text>
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item) => item.id.toString()}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.horizontalList}
-      />
-    </>
-  );
-
-  const renderPostsContent = () => (
-    <>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Athletes' Recent Posts</Text>
-      </View>
-      
-      <FlatList
-        data={athletePosts}
-        renderItem={renderAthletePost}
-        keyExtractor={(item) => item.id.toString()}
-        scrollEnabled={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <FontAwesome5 name="newspaper" size={48} color={Theme.colors.textSecondary} />
-            <Text style={styles.emptyText}>No recent posts from your athletes</Text>
-          </View>
-        }
-      />
-    </>
-  );
-
-  const renderPerformanceContent = () => (
-    <>
-      {/* Best Scores by Test Type */}
-      {assessmentStats?.best_scores_by_type && (
-        <>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Assessment Performance</Text>
-          </View>
-          
-          <View style={styles.performanceGrid}>
-            {assessmentStats.best_scores_by_type.map((score) => (
-              <View key={score.test_type} style={styles.scoreCard}>
-                <Text style={styles.scoreCardTitle}>
-                  {score.test_type.replace('_', ' ').toUpperCase()}
-                </Text>
-                <Text style={styles.scoreCardBest}>
-                  Best: {score.best_score}%
-                </Text>
-                <Text style={styles.scoreCardAvg}>
-                  Avg: {score.average_score}%
-                </Text>
-                <Text style={styles.scoreCardCount}>
-                  {score.total_assessments} tests
-                </Text>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
-
-      {/* Top Performers */}
-      {assessmentStats?.top_performers && assessmentStats.top_performers.length > 0 && (
-        <>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Top Performers</Text>
-          </View>
-          
-          <FlatList
-            data={assessmentStats.top_performers}
-            renderItem={renderTopPerformer}
-            keyExtractor={(item) => item.id.toString()}
-            scrollEnabled={false}
-          />
-        </>
-      )}
-
-      {/* Recent Improvements */}
-      {assessmentStats?.recent_improvements && assessmentStats.recent_improvements.length > 0 && (
-        <>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Improvements</Text>
-          </View>
-          
-          <View style={styles.improvementsContainer}>
-            {assessmentStats.recent_improvements.map((improvement, index) => (
-              <View key={index} style={styles.improvementCard}>
+      {connectedAthletes.length > 0 ? (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.athletesScroll}
+        >
+          {connectedAthletes.slice(0, 8).map((athlete, index) => (
+            <Animated.View
+              key={athlete.id}
+              entering={FadeInRight.delay(index * 50).duration(400)}
+            >
+              <TouchableOpacity
+                style={styles.athleteCard}
+                onPress={() => navigateToAthleteProfile(athlete)}
+              >
                 <Image
-                  source={{ uri: improvement.athlete.profile_photo || 'https://via.placeholder.com/40' }}
-                  style={styles.improvementPhoto}
+                  source={{ uri: athlete.profile_photo || 'https://via.placeholder.com/70' }}
+                  style={styles.athleteCardPhoto}
                 />
-                <View style={styles.improvementInfo}>
-                  <Text style={styles.improvementName}>{improvement.athlete.name}</Text>
-                  <Text style={styles.improvementTest}>
-                    {improvement.test_type.replace('_', ' ')}
+                <Text style={styles.athleteCardName} numberOfLines={1}>
+                  {athlete.name?.split(' ')[0] || 'Athlete'}
+                </Text>
+                <View style={styles.athleteCardScore}>
+                  <Text style={styles.athleteCardScoreText}>
+                    {athlete.ai_score || 0}%
                   </Text>
                 </View>
-                <View style={styles.improvementScore}>
-                  <Ionicons name="trending-up" size={20} color={Theme.colors.success} />
-                  <Text style={styles.improvementValue}>+{improvement.improvement}%</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </>
+                <Text style={styles.athleteCardSport} numberOfLines={1}>
+                  {athlete.sport || 'Sport'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+
+          <TouchableOpacity
+            style={styles.addAthleteCard}
+            onPress={() => setShowSearchModal(true)}
+          >
+            <View style={styles.addAthleteIcon}>
+              <Ionicons name="add" size={30} color="#667eea" />
+            </View>
+            <Text style={styles.addAthleteText}>Find More</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (
+        <View style={styles.emptyAthletes}>
+          <FontAwesome5 name="users" size={40} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyAthletesText}>No athletes connected yet</Text>
+          <TouchableOpacity
+            style={styles.emptyAthletesButton}
+            onPress={() => setShowSearchModal(true)}
+          >
+            <Text style={styles.emptyAthletesButtonText}>Find Athletes</Text>
+          </TouchableOpacity>
+        </View>
       )}
-    </>
+    </Animated.View>
   );
 
-  if (loading) {
+  // ============================================
+  // LOADING STATE
+  // ============================================
+  if (loading && !stats) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Theme.colors.primary} />
+        <ActivityIndicator size="large" color="#667eea" />
+        <Text style={styles.loadingText}>Loading dashboard...</Text>
       </View>
     );
   }
 
+  // ============================================
+  // MAIN RENDER
+  // ============================================
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
       <ScrollView
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => {
-            setRefreshing(true);
-            loadDashboardData();
-          }} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#667eea"
+            colors={['#667eea']}
+          />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <LinearGradient
-            colors={Theme.colors.gradient.coach}
-            style={StyleSheet.absoluteFillObject}
-          />
-          
-          <View style={styles.headerContent}>
-            <View style={styles.profileSection}>
-  <Image
-    source={{ 
-      uri: getImageUrl(stats?.coach_info?.profile_photo) || 'https://via.placeholder.com/100' 
-    }}
-    style={styles.profilePhoto}
-  />
-  <View style={styles.profileInfo}>
-    <Text style={styles.coachName}>{stats?.coach_info?.name || 'Coach'}</Text>
-    <Text style={styles.coachSpecialization}>
-      {stats?.coach_info?.specialization || 'General'} Coach
-    </Text>
-    <Text style={styles.coachExperience}>
-      {stats?.coach_info?.experience || 0} years experience
-    </Text>
-  </View>
-</View>
-            {/* Stats Grid */}
-            <View style={styles.statsGrid}>
-  <View style={styles.statCard}>
-    <FontAwesome5 name="users" size={24} color={Theme.colors.primary} />
-    <Text style={styles.statNumber}>{stats?.connected_athletes || 0}</Text>
-    <Text style={styles.statLabel}>Athletes</Text>
-  </View>
-  
-  <View style={styles.statCard}>
-    <Ionicons name="document-text" size={24} color={Theme.colors.secondary} />
-    <Text style={styles.statNumber}>{stats?.total_assessments || 0}</Text>
-    <Text style={styles.statLabel}>Reviews</Text>
-  </View>
-  
-  <View style={styles.statCard}>
-    <Ionicons name="notifications" size={24} color={Theme.colors.accent} />
-    <Text style={styles.statNumber}>{stats?.pending_requests || 0}</Text>
-    <Text style={styles.statLabel}>Requests</Text>
-  </View>
-</View>
-          </View>
-        </View>
-
-        {/* Tabs */}
-        {renderTabs()}
-
-        {/* Tab Content */}
-        <View style={styles.tabContent}>
-          {activeTab === 'overview' && renderOverviewContent()}
-          {activeTab === 'posts' && renderPostsContent()}
-          {activeTab === 'performance' && renderPerformanceContent()}
-        </View>
+        {renderHeader()}
+        {renderQuickActions()}
+        {renderTopAthletes()}
+        {renderActiveAthletes()}
+        {renderRisingStars()}
+        {renderConnectedAthletes()}
+        
+        <View style={{ height: 100 }} />
       </ScrollView>
-    </View>
+
+      <SearchModal
+        visible={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        navigation={navigation}
+      />
+    </SafeAreaView>
   );
 }
 
-// Add these additional styles to your existing styles
-const additionalStyles = StyleSheet.create({
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    paddingBottom: 10,
-    backgroundColor: Theme.colors.background,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginHorizontal: 5,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  activeTab: {
-    backgroundColor: Theme.colors.primary,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
-  },
-  activeTabText: {
-    color: '#fff',
-  },
-  tabContent: {
-    paddingBottom: 20,
-  },
-  quickActionsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    gap: 10,
-  },
-  quickActionButton: {
-    flex: 1,
-  },
-  quickActionGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 15,
-    borderRadius: 12,
-    gap: 8,
-  },
-  quickActionText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  horizontalList: {
-    paddingHorizontal: 20,
-  },
-  athleteCardCompact: {
-    alignItems: 'center',
-    marginRight: 15,
-    width: 80,
-  },
-  athletePhotoCompact: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginBottom: 8,
-  },
-  athleteNameCompact: {
-    fontSize: 12,
-    color: Theme.colors.text,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  athleteScoreCompact: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: Theme.colors.primary,
-  },
-  postCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 15,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  postUserPhoto: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  postUserInfo: {
-    flex: 1,
-  },
-  postUserName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Theme.colors.text,
-  },
-  postMeta: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-  },
-  verifiedBadge: {
-    backgroundColor: Theme.colors.success + '20',
-    borderRadius: 15,
-    padding: 5,
-  },
-  postContent: {
-    fontSize: 14,
-    color: Theme.colors.text,
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  postFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  postTime: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-  },
-  postStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  postStatText: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-  },
-  performanceGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 15,
-    gap: 10,
-  },
-  scoreCard: {
-    flex: 1,
-    minWidth: (screenWidth - 50) / 2,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  scoreCardTitle: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-  },
-  scoreCardBest: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Theme.colors.success,
-    marginBottom: 4,
-  },
-  scoreCardAvg: {
-    fontSize: 16,
-    color: Theme.colors.text,
-    marginBottom: 4,
-  },
-  scoreCardCount: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-  },
-  topPerformerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 15,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  topPerformerPhoto: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
-  },
-  topPerformerInfo: {
-    flex: 1,
-  },
-  topPerformerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Theme.colors.text,
-  },
-  topPerformerSport: {
-    fontSize: 14,
-    color: Theme.colors.textSecondary,
-  },
-  topPerformerScore: {
-    alignItems: 'center',
-  },
-  topPerformerScoreValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Theme.colors.primary,
-  },
-  topPerformerScoreLabel: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-  },
-  improvementsContainer: {
-    paddingHorizontal: 20,
-  },
-  improvementCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Theme.colors.success + '10',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Theme.colors.success + '30',
-  },
-  improvementPhoto: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  improvementInfo: {
-    flex: 1,
-  },
-  improvementName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Theme.colors.text,
-  },
-  improvementTest: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
-    textTransform: 'capitalize',
-  },
-  improvementScore: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  improvementValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Theme.colors.success,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: Theme.colors.textSecondary,
-    marginTop: 10,
-  },
-});
-
-// Merge styles
-// Merge the existing styles with additional styles
+// ============================================
+// STYLES
+// ============================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -671,87 +708,462 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Theme.colors.background,
   },
-  header: {
-    paddingTop: 50,
-    paddingBottom: 30,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    overflow: 'hidden',
-  },
-  headerContent: {
-    paddingHorizontal: 20,
-  },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  profilePhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  profileInfo: {
-    marginLeft: 20,
-  },
-  coachName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  coachSpecialization: {
+  loadingText: {
+    marginTop: 12,
+    color: Theme.colors.textSecondary,
     fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
   },
-  coachExperience: {
+
+  // Header
+  header: {
+    paddingTop: Platform.OS === 'ios' ? 10 : 40,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+  },
+  topNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  greetingContainer: {
+    flex: 1,
+  },
+  greetingText: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  coachNameText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
     marginTop: 2,
   },
-  statsGrid: {
+  headerActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -10,
+    alignItems: 'center',
+    gap: 12,
   },
-  statCard: {
-    width: '50%',
-    paddingHorizontal: 10,
-    marginBottom: 20,
+  headerIconButton: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    padding: 10,
+    borderRadius: 12,
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#e74c3c',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  statNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  badgeText: {
     color: '#fff',
-    marginTop: 8,
+    fontSize: 10,
+    fontWeight: '700',
   },
-  statLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
+  headerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+
+  // Stats Cards
+  statsCardsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statsCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+  },
+  statsCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statsCardNumber: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  statsCardLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 2,
+    textTransform: 'uppercase',
+  },
+
+  // Section
+  section: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 15,
-    marginTop: 20,
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  sectionTitleContainer: {
+    flex: 1,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
     color: Theme.colors.text,
   },
-  seeAllText: {
-    fontSize: 16,
-    color: Theme.colors.primary,
+  sectionSubtitle: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
   },
-  
-  // Add all the additional styles
-  ...additionalStyles,
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#667eea',
+  },
+
+  // Quick Actions
+  quickActionsScroll: {
+    paddingRight: 16,
+  },
+  quickActionItem: {
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  quickActionGradient: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    fontWeight: '500',
+  },
+
+  // Top Athletes Cards
+  athletesScroll: {
+    paddingRight: 16,
+  },
+  topAthleteCard: {
+    width: 130,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  rankBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  rankBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1a1a2e',
+  },
+  athletePhotoContainer: {
+    position: 'relative',
+    marginTop: 10,
+  },
+  topAthletePhoto: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 3,
+    borderColor: '#667eea',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#2ecc71',
+    borderWidth: 2,
+    borderColor: Theme.colors.surface,
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 10,
+  },
+  topAthleteName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Theme.colors.text,
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  scoreContainer: {
+    backgroundColor: '#667eea',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  scoreValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  topAthleteSport: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  topAthleteLocation: {
+    fontSize: 10,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // Active Athletes
+  activeAthleteCard: {
+    alignItems: 'center',
+    marginRight: 16,
+    width: 80,
+  },
+  activePhotoContainer: {
+    position: 'relative',
+  },
+  activeAthletePhoto: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  statusDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: Theme.colors.background,
+  },
+  activeAthleteName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Theme.colors.text,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  activeAthleteScore: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#667eea',
+    marginTop: 2,
+  },
+  activeAthleteSport: {
+    fontSize: 10,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // Rising Stars
+  risingStarCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#2ecc7130',
+  },
+  risingStarRank: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2ecc71',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  risingStarRankText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  risingStarPhoto: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    marginRight: 12,
+  },
+  risingStarInfo: {
+    flex: 1,
+  },
+  risingStarName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Theme.colors.text,
+  },
+  risingStarSport: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  risingStarProgress: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  improvementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2ecc71',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  improvementText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+
+  // Connected Athletes (Your Athletes)
+  athleteCard: {
+    alignItems: 'center',
+    marginRight: 14,
+    width: 85,
+  },
+  athleteCardPhoto: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: Theme.colors.border,
+  },
+  athleteCardName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Theme.colors.text,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  athleteCardScore: {
+    backgroundColor: '#667eea',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  athleteCardScoreText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  athleteCardSport: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  addAthleteCard: {
+    width: 85,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addAthleteIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 2,
+    borderColor: '#667eea',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  addAthleteText: {
+    fontSize: 12,
+    color: '#667eea',
+    fontWeight: '600',
+  },
+
+  // Empty States
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 16,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    marginTop: 10,
+  },
+  emptyStateSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 12,
+    gap: 10,
+  },
+  emptyStateTextSmall: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+  },
+  emptyAthletes: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 16,
+  },
+  emptyAthletesText: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  emptyAthletesButton: {
+    backgroundColor: '#667eea',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  emptyAthletesButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
 });

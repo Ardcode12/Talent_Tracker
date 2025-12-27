@@ -22,15 +22,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getImageUrl } from '../services/api';
-import { startConversation } from '../services/api';
+// At the top of ConnectionsScreen.tsx
+import { getImageUrl, getImageUrlWithFallback, startConversation } from '../services/api';
+
 import { useNavigation } from '@react-navigation/native';
 
  // ADD THIS LINE
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const API_URL = 'http://10.194.241.35:8000/api'; // Update with your backend URL
+const API_URL = 'http://10.174.246.35:8000/api'; // Update with your backend URL
 
 // Interfaces
 interface Connection {
@@ -153,23 +154,22 @@ const handleMessage = async (user: Connection) => {
       fetchWithAuth(`${API_URL}/connections/groups`),
     ]);
 
-    // Process profile photos for connections
+    // Process profile photos for connections WITH FALLBACK NAMES
     const processedConnections = (connectionsData.data || []).map(conn => ({
       ...conn,
-      profilePhoto: getImageUrl(conn.profilePhoto)
+      profilePhoto: getImageUrlWithFallback(conn.profilePhoto, conn.name)  // UPDATED
     }));
 
-    // Process profile photos for requests
+    // Process profile photos for requests WITH FALLBACK NAMES
     const processedRequests = (requestsData.data || []).map(req => ({
       ...req,
-      profilePhoto: getImageUrl(req.profilePhoto)
+      profilePhoto: getImageUrlWithFallback(req.profilePhoto, req.name)  // UPDATED
     }));
 
     setMyConnections(processedConnections);
     setPendingRequests(processedRequests);
     setGroups(groupsData.data || []);
 
-    // Fetch available connections
     await fetchAvailableConnections(1, true);
 
   } catch (error) {
@@ -197,10 +197,10 @@ const handleMessage = async (user: Connection) => {
 
     const response = await fetchWithAuth(`${API_URL}/connections/available?${params}`);
     
-    // Process profile photos
+    // Process profile photos WITH FALLBACK NAMES
     const processedData = (response.data || []).map(user => ({
       ...user,
-      profilePhoto: getImageUrl(user.profilePhoto)
+      profilePhoto: getImageUrlWithFallback(user.profilePhoto, user.name)  // UPDATED
     }));
     
     if (reset) {

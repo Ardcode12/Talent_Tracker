@@ -19,6 +19,13 @@ import { Theme } from '../constants/Theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateProfile } from '../services/api';
 
+type RootStackParamList = {
+  Login: undefined;
+  Main: undefined;
+  CoachMain: undefined;  // ✅ ADD THIS
+  ProfileCompletion: undefined;
+};
+
 export default function ProfileCompletionScreen({ navigation }) {
   const [profileImage, setProfileImage] = useState(null);
   const [age, setAge] = useState('');
@@ -114,7 +121,9 @@ export default function ProfileCompletionScreen({ navigation }) {
     return true;
   };
 
-  const handleSubmit = async () => {
+  // frontend/screens/ProfileCompletionScreen.tsx
+
+const handleSubmit = async () => {
   if (!validateForm()) return;
 
   setLoading(true);
@@ -134,16 +143,13 @@ export default function ProfileCompletionScreen({ navigation }) {
     // Add profile image if exists
     if (profileImage) {
       if (Platform.OS === 'web') {
-        // For web, fetch the image and create a proper blob
         try {
           const response = await fetch(profileImage);
           const blob = await response.blob();
           
-          // Determine the file type from the blob or URI
-          let fileExtension = 'jpg'; // default
+          let fileExtension = 'jpg';
           let mimeType = blob.type || 'image/jpeg';
           
-          // Check blob type first
           if (mimeType.includes('png')) {
             fileExtension = 'png';
           } else if (mimeType.includes('gif')) {
@@ -152,41 +158,25 @@ export default function ProfileCompletionScreen({ navigation }) {
             fileExtension = 'webp';
           } else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) {
             fileExtension = 'jpg';
-          } else {
-            // Fallback: try to extract from URI
-            const uriParts = profileImage.split('.');
-            if (uriParts.length > 1) {
-              const ext = uriParts[uriParts.length - 1].toLowerCase();
-              if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-                fileExtension = ext === 'jpeg' ? 'jpg' : ext;
-              }
-            }
           }
           
-          // Create a new File object with proper type and name
           const file = new File([blob], `profile_${userData.id}.${fileExtension}`, {
             type: mimeType || `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`
           });
           
           formData.append('profileImage', file);
-          console.log('Web image prepared:', file.name, file.type);
         } catch (error) {
           console.error('Error processing image for web:', error);
-          // Continue without image if there's an error
-          console.log('Continuing without profile image');
         }
       } else {
-        // For mobile (React Native)
         const imageUriParts = profileImage.split('.');
-        let imageExtension = 'jpg'; // default
+        let imageExtension = 'jpg';
         
         if (imageUriParts.length > 1) {
           imageExtension = imageUriParts[imageUriParts.length - 1].toLowerCase();
-          // Normalize jpeg to jpg
           if (imageExtension === 'jpeg') imageExtension = 'jpg';
         }
         
-        // Ensure extension is valid
         if (!['jpg', 'png', 'gif', 'webp'].includes(imageExtension)) {
           imageExtension = 'jpg';
         }
@@ -196,17 +186,12 @@ export default function ProfileCompletionScreen({ navigation }) {
           type: `image/${imageExtension === 'jpg' ? 'jpeg' : imageExtension}`,
           name: `profile_${userData.id}.${imageExtension}`,
         } as any);
-        console.log('Mobile image prepared:', `profile_${userData.id}.${imageExtension}`);
       }
     }
 
-    console.log('Sending profile update with userId:', userData.id);
-
-    // Call API to update profile
     const response = await updateProfile(formData);
 
     if (response && response.user) {
-      // Update user data in AsyncStorage
       const updatedUserData = {
         ...userData,
         ...response.user,
@@ -218,18 +203,23 @@ export default function ProfileCompletionScreen({ navigation }) {
       
       await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
       await AsyncStorage.setItem('profileCompleted', 'true');
-      
-      // Save user-specific completion flag
       await AsyncStorage.setItem(`profile_completed_${userData.id}`, 'true');
 
-      // Navigate to Main without showing alert
-      console.log('Profile saved successfully, navigating to Main');
+      // ✅ FIX: Navigate based on user role
+      const userRole = userData.role || await AsyncStorage.getItem('userRole');
+      console.log('Profile completed, navigating based on role:', userRole);
       
-      // Use navigation.reset to ensure clean navigation
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Main' }],
-      });
+      if (userRole === 'coach') {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'CoachMain' }],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Main' }],
+        });
+      }
     } else {
       throw new Error('Failed to update profile');
     }
@@ -247,28 +237,33 @@ export default function ProfileCompletionScreen({ navigation }) {
 const handleSkip = async () => {
   try {
     if (userData && userData.id) {
-      // Save skip flags
       await AsyncStorage.setItem('profileCompleted', 'skipped');
       await AsyncStorage.setItem(`profile_completed_${userData.id}`, 'skipped');
     }
 
-    console.log('Skipping profile setup, navigating to Main');
+    // ✅ FIX: Navigate based on user role
+    const userRole = userData?.role || await AsyncStorage.getItem('userRole');
+    console.log('Skipping profile, navigating based on role:', userRole);
     
-    // Navigate to main app using reset
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Main' }],
-    });
+    if (userRole === 'coach') {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'CoachMain' }],
+      });
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
+    }
   } catch (error) {
     console.error('Error skipping profile:', error);
-    // Still try to navigate even if storage fails
     navigation.reset({
       index: 0,
       routes: [{ name: 'Main' }],
     });
   }
 };
-
 
   return (
     <LinearGradient

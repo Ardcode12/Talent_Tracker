@@ -82,7 +82,12 @@ def generate_shuttle_run_dataset(n_samples=5000):
         total_time = max(8.0, min(16.0, total_time))
         
         # Determine performance band
-        performance_band = 'Below Average'
+         performance_band = 'Below Average'
+
+        # -------- NEW --------
+        # Machine-learning target columns
+        label = performance_band                         # for classifier
+        ai_score = max(0, 100 - (total_time - 8)*12)     # crude linear scale
         for band, (min_time, max_time) in performance_bands.items():
             if min_time <= total_time < max_time:
                 performance_band = band

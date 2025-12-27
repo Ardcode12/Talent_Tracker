@@ -1,5 +1,6 @@
+# backend/schemas.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -10,17 +11,12 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     role: Optional[str] = None
     sport: Optional[str] = None
-    experience: Optional[int] = None      # change from str to int
+    experience: Optional[str] = None
     specialization: Optional[str] = None
 
 
 class UserCreate(UserBase):
     password: str
-
-    model_config = {
-        "extra": "forbid"
-    }
-
 
 
 class UserLogin(BaseModel):
@@ -28,27 +24,37 @@ class UserLogin(BaseModel):
     password: str
 
 
-# 🔑 Full profile schema
 class UserProfile(UserBase):
     id: int
     age: Optional[int] = None
     location: Optional[str] = None
     bio: Optional[str] = None
-    achievements: Optional[str] = None   # stored as JSON text
+    achievements: Optional[str] = None
     height: Optional[str] = None
     weight: Optional[str] = None
-    skills: Optional[str] = None          # stored as JSON text
+    skills: Optional[str] = None
     profile_image: Optional[str] = None
     profile_photo: Optional[str] = None
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        orm_mode = True
 
 
 class AuthResponse(BaseModel):
     token: str
     user: UserProfile
+
+
+# ---------- SIMPLIFIED USER FOR POSTS/MESSAGES ----------
+class PostUser(BaseModel):
+    id: int
+    name: str
+    profile_photo: Optional[str]
+    sport: Optional[str]
+    location: Optional[str]
+
+    class Config:
+        orm_mode = True
 
 
 # ---------- POSTS ----------
@@ -62,18 +68,6 @@ class PostCreate(PostBase):
     pass
 
 
-class PostUser(BaseModel):
-    id: int
-    name: str
-    profile_photo: Optional[str]
-    sport: Optional[str]
-    location: Optional[str]
-
-    model_config = {
-        "from_attributes": True
-    }
-
-
 class PostResponse(BaseModel):
     id: int
     user: PostUser
@@ -85,9 +79,8 @@ class PostResponse(BaseModel):
     is_liked: bool = False
     created_at: datetime
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        orm_mode = True
 
 
 # ---------- COMMENTS ----------
@@ -105,9 +98,65 @@ class CommentResponse(BaseModel):
     text: str
     created_at: datetime
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        orm_mode = True
+
+
+# ---------- MESSAGES ----------
+class MessageBase(BaseModel):
+    text: str
+    attachment_url: Optional[str] = None
+    attachment_type: Optional[str] = None
+
+
+class MessageCreate(MessageBase):
+    pass
+
+
+class MessageUpdate(BaseModel):
+    text: Optional[str] = None
+
+
+class MessageResponse(BaseModel):
+    id: int
+    sender_id: int
+    sender: PostUser
+    text: str
+    attachment_url: Optional[str]
+    attachment_type: Optional[str]
+    is_read: bool
+    created_at: datetime
+    edited_at: Optional[datetime]
+
+    class Config:
+        orm_mode = True
+
+
+class ConversationBase(BaseModel):
+    pass
+
+
+class ConversationCreate(BaseModel):
+    recipient_id: int
+
+
+class ConversationResponse(BaseModel):
+    id: int
+    other_user: PostUser
+    last_message_at: Optional[datetime]
+    last_message_preview: Optional[str]
+    unread_count: int = 0
+    is_online: bool = False
+
+    class Config:
+        orm_mode = True
+
+
+class ConversationDetailResponse(ConversationResponse):
+    messages: List[MessageResponse] = []
+
+    class Config:
+        orm_mode = True
 
 
 # ---------- STATS, CONNECTIONS, ETC ----------
@@ -118,9 +167,8 @@ class UserStats(BaseModel):
     aiScore: Optional[float]
     weeklyProgress: float
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        orm_mode = True
 
 
 class TrendingAthlete(BaseModel):
@@ -131,9 +179,8 @@ class TrendingAthlete(BaseModel):
     highlight_stat: str
     badge: Optional[str]
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        orm_mode = True
 
 
 class AnnouncementResponse(BaseModel):
@@ -143,9 +190,8 @@ class AnnouncementResponse(BaseModel):
     icon: str
     link: Optional[str]
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        orm_mode = True
 
 
 class ConnectionSuggestion(BaseModel):
@@ -156,9 +202,8 @@ class ConnectionSuggestion(BaseModel):
     location: Optional[str]
     is_online: bool
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        orm_mode = True
 
 
 class PerformanceDataResponse(BaseModel):
@@ -167,6 +212,5 @@ class PerformanceDataResponse(BaseModel):
     unit: str
     recorded_at: datetime
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        orm_mode = True
