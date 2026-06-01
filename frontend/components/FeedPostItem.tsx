@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Theme } from '../constants/Theme';
 import { GlassmorphicCard } from './GlassmorphicCard';
 import { AnimatedGradient } from './AnimatedGradient';
+import { getImageUrlWithFallback } from '../services/api';
 
 interface FeedPost {
   id: string;
@@ -128,13 +129,11 @@ export const FeedPostItem: React.FC<FeedPostItemProps> = ({ item, index }) => {
         <View style={styles.postHeader}>
           <TouchableOpacity style={styles.profileContainer}>
             <Image 
-              source={{ 
-                uri: item.userInfo.profilePhoto,
-                headers: { Accept: '*/*' }
-              }} 
-              style={styles.profilePhoto}
-              defaultSource={require('../assets/images/icon.png')}
-            />
+  source={{ 
+    uri: getImageUrlWithFallback(item.userInfo.profilePhoto, item.userInfo.name),
+  }} 
+  style={styles.profilePhoto}
+/>
             <View style={styles.profileRing} />
           </TouchableOpacity>
           

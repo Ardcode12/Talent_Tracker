@@ -13,6 +13,7 @@ import { getUnreadCount } from './services/api';
 // Import your screens
 import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
+import CommentsScreen from './screens/CommentsScreen';
 import ExploreScreen from './screens/Assestment';
 import ConnectionsScreen from './screens/ConnectionsScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -312,7 +313,14 @@ export default function App() {
               title: 'Profile',
             }}
           />
-          
+          <Stack.Screen 
+  name="Comments" 
+  component={CommentsScreen}
+  options={{
+    headerShown: false,
+    presentation: 'modal',
+  }}
+/>
           {/* OTHER SCREENS */}
           <Stack.Screen name="CreatePost" component={CreatePostScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="ChatScreen" component={ChatScreen} />

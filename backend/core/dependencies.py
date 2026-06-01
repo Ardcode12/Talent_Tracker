@@ -40,22 +40,19 @@ def generate_avatar_url(name: str, size: int = 128) -> str:
 
 def get_image_url(image_path: Optional[str], fallback_name: str = None) -> Optional[str]:
     """
-    Convert relative image path to full URL.
-    Returns None if no valid path and no fallback name provided.
+    Return a clean image path. Returns relative paths so the frontend
+    can prepend the correct network IP (avoids localhost issues on mobile).
     """
-    # Handle None, empty, or invalid values
     if not image_path:
         if fallback_name:
             return generate_avatar_url(fallback_name)
         return None
     
-    # Handle string "null" or "undefined"
-    if image_path in ('null', 'undefined', ''):
+    if str(image_path).lower() in ('null', 'undefined', 'none', ''):
         if fallback_name:
             return generate_avatar_url(fallback_name)
         return None
     
-    # Clean the path
     clean_path = str(image_path).strip()
     if not clean_path:
         if fallback_name:
@@ -66,39 +63,35 @@ def get_image_url(image_path: Optional[str], fallback_name: str = None) -> Optio
     if clean_path.startswith('http://') or clean_path.startswith('https://'):
         return clean_path
     
-    # Build full URL from relative path
+    # Return relative path - frontend will prepend correct BASE_URL
     if not clean_path.startswith('/'):
-        clean_path = '/' + clean_path
+        clean_path = '/uploads/' + clean_path
     
-    return f"{BASE_URL}{clean_path}"
+    return clean_path
 
 
 def get_image_url_with_fallback(image_path: Optional[str], name: str = 'User', size: int = 128) -> str:
     """
     Get image URL with guaranteed fallback (never returns None).
-    Always returns either the actual image URL or a generated avatar.
+    Returns relative paths so the frontend can prepend the correct network IP.
     """
-    # Check if we have a valid image path
     if image_path:
-        # Check for invalid string values
-        if image_path in ('null', 'undefined'):
+        if str(image_path).lower() in ('null', 'undefined', 'none'):
             return generate_avatar_url(name, size)
         
         clean_path = str(image_path).strip()
         if not clean_path:
             return generate_avatar_url(name, size)
         
-        # If it's already a full URL, return as is
         if clean_path.startswith('http://') or clean_path.startswith('https://'):
             return clean_path
         
-        # Build full URL from relative path
+        # Return relative path - frontend will prepend correct BASE_URL
         if not clean_path.startswith('/'):
-            clean_path = '/' + clean_path
+            clean_path = '/uploads/' + clean_path
         
-        return f"{BASE_URL}{clean_path}"
+        return clean_path
     
-    # Generate avatar with initials
     return generate_avatar_url(name, size)
 
 

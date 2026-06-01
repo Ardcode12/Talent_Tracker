@@ -30,13 +30,13 @@ DATABASE_URL = os.getenv(
     f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 )
 
-# Base URL for the API
-BASE_URL = os.getenv("BASE_URL", "http://10.177.253.35:8000").strip('"').strip("'")
+# Base URL for the API - ALWAYS use localhost for local development
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000").strip('"').strip("'")
 
 # Security settings
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here").strip('"').strip("'")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days for better UX
 
 
 # Simple settings class for compatibility
@@ -48,6 +48,11 @@ class Settings:
         self.access_token_expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
         self.api_v1_str = "/api"
         self.project_name = "TalentTracker"
+        self.base_url = BASE_URL
 
 
 settings = Settings()
+
+# Print config on import for debugging
+print(f"[Config] BASE_URL: {BASE_URL}")
+print(f"[Config] Database: {DB_HOST}:{DB_PORT}/{DB_NAME}")

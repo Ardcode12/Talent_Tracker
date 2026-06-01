@@ -24,6 +24,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Theme } from '../constants/Theme';
 import { uploadAssessment, getAssessments, getAssessmentStats } from '../services/api';
 
+const fixEmojiEncoding = (text: string | null | undefined): string => {
+  if (!text) return '';
+  
+  try {
+    // Check if it looks like mojibake (incorrectly decoded UTF-8)
+    // Common pattern: Ã¢ÂÂ or Ã°Â etc.
+    if (text.includes('Ã') || text.includes('Â') || text.includes('ð')) {
+      // Try to fix by encoding as Latin-1 and decoding as UTF-8
+      const bytes = new Uint8Array([...text].map(c => c.charCodeAt(0)));
+      const decoder = new TextDecoder('utf-8');
+      return decoder.decode(bytes);
+    }
+    return text;
+  } catch (e) {
+    // If fix fails, return original
+    return text;
+  }
+};
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ASSESSMENT_TESTS = [
@@ -205,10 +224,10 @@ export default function AssessmentScreen() {
       setManualScore('');
       
       Alert.alert(
-        'Assessment Complete!', 
-        `Your ${selectedTest.name} score: ${result.ai_score?.toFixed(1) ?? 'N/A'}%\n\n${result.feedback ?? ''}`, 
-        [{ text: 'OK', onPress: () => loadData() }]
-      );
+  'Assessment Complete!', 
+  fixEmojiEncoding(`Your ${selectedTest.name} score: ${result.ai_score?.toFixed(1) ?? 'N/A'}%\n\n${result.feedback ?? ''}`), 
+  [{ text: 'OK', onPress: () => loadData() }]
+);
     } catch (error) {
       setIsAnalyzing(false);
       Alert.alert('Error', 'Failed to analyze video. Please try again.');
@@ -261,38 +280,28 @@ export default function AssessmentScreen() {
   );
 
   const renderAssessment = ({ item }) => (
-    <View style={styles.assessmentCard}>
-      <View style={styles.assessmentHeader}>
-        <Text style={styles.assessmentTest}>
-          {ASSESSMENT_TESTS.find((t) => t.id === item.test_type)?.name || item.test_type}
-        </Text>
-        <Text style={styles.assessmentDate}>
-          {new Date(item.created_at).toLocaleDateString()}
-        </Text>
-      </View>
-      <View style={styles.assessmentScores}>
-        <View style={styles.scoreItem}>
-          <Text style={styles.scoreLabel}>AI Score</Text>
-          <Text style={styles.scoreValue}>{item.ai_score?.toFixed(1) ?? 'N/A'}%</Text>
-        </View>
-      </View>
-      {item.ai_feedback && (
-        <Text style={styles.assessmentFeedback}>{item.ai_feedback}</Text>
-      )}
+  <View style={styles.assessmentCard}>
+    <View style={styles.assessmentHeader}>
+      <Text style={styles.assessmentTest}>
+        {ASSESSMENT_TESTS.find((t) => t.id === item.test_type)?.name || item.test_type}
+      </Text>
+      <Text style={styles.assessmentDate}>
+        {new Date(item.created_at).toLocaleDateString()}
+      </Text>
     </View>
-  );
-
-  // ✅ Show message if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <View style={[styles.container, styles.notAuthenticatedContainer]}>
-        <Text style={styles.notAuthenticatedText}>
-          Please log in to access AI assessments
-        </Text>
+    <View style={styles.assessmentScores}>
+      <View style={styles.scoreItem}>
+        <Text style={styles.scoreLabel}>AI Score</Text>
+        <Text style={styles.scoreValue}>{item.ai_score?.toFixed(1) ?? 'N/A'}%</Text>
       </View>
-    );
-  }
-
+    </View>
+    {item.ai_feedback && (
+      <Text style={styles.assessmentFeedback}>
+        {fixEmojiEncoding(item.ai_feedback)}
+      </Text>
+    )}
+  </View>
+);
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />

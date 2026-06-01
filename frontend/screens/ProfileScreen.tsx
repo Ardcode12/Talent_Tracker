@@ -28,6 +28,7 @@ import {
   updateProfile, 
   logout, 
   getImageUrl,
+  getImageUrlWithFallback,  // ADD THIS
   getAssessmentStats,
   sendConnectionRequest,
   startConversation,
@@ -114,7 +115,15 @@ export default function ProfileScreen() {
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const [sendingRequest, setSendingRequest] = useState(false);
   
-  const [assessmentStats, setAssessmentStats] = useState<AssessmentStats | null>(null);
+ const [assessmentStats, setAssessmentStats] = useState<AssessmentStats | null>({
+  total_assessments: 0,
+  average_score: null,
+  current_ai_score: null,
+  national_rank: null,
+  total_athletes: 0,
+  percentile: null,
+  by_test_type: {}
+});
   const [connectionStats, setConnectionStats] = useState<ConnectionStats>({ total: 0, pending: 0 });
   const [userPosts, setUserPosts] = useState<UserPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
@@ -175,31 +184,61 @@ export default function ProfileScreen() {
   // LOAD OWN PROFILE
   // ============================================
   const loadOwnProfile = async (currentUser: any) => {
-    try {
-      setUserData(currentUser);
+  try {
+    setUserData(currentUser);
+    
+    // Use getImageUrlWithFallback instead of getImageUrl
+    const photoUrl = getImageUrlWithFallback(
+      currentUser.profile_image || currentUser.profile_photo,
+      currentUser.name || 'User'
+    );
+    setProfileImage(photoUrl);
+    
+    setTempBio(currentUser.bio || '');
+    setTempInfo({
+      age: currentUser.age?.toString() || '',
+      height: currentUser.height || '',
+      weight: currentUser.weight || '',
+      location: currentUser.location || '',
+    });
+    setTempAchievements(currentUser.achievements || '');
+    
+    // Fetch all data in parallel
+    const [stats, connResponse, reqResponse] = await Promise.all([
+      getAssessmentStats(),
+      ApiService.makeAuthenticatedRequest('/connections'),
+      ApiService.makeAuthenticatedRequest('/connections/requests'),
+    ]);
+    
+    // Load posts separately
+    await loadOwnPosts();
+    
+    // Set assessment stats with null checks
+    if (stats) {
+      console.log('=== Assessment Stats Loaded ===');
+      console.log('national_rank:', stats.national_rank);
+      console.log('current_ai_score:', stats.current_ai_score);
+      console.log('average_score:', stats.average_score);
+      setAssessmentStats(stats);
       
-      if (currentUser.profile_image || currentUser.profile_photo) {
-        setProfileImage(getImageUrl(currentUser.profile_image || currentUser.profile_photo));
-      }
-      
-      setTempBio(currentUser.bio || '');
-      setTempInfo({
-        age: currentUser.age?.toString() || '',
-        height: currentUser.height || '',
-        weight: currentUser.weight || '',
-        location: currentUser.location || '',
-      });
-      setTempAchievements(currentUser.achievements || '');
-      
-      await Promise.all([
-        loadOwnAssessmentStats(),
-        loadOwnConnectionStats(),
-        loadOwnPosts(),
-      ]);
-    } catch (error) {
-      console.error('Error loading own profile:', error);
+      // IMPORTANT: Update userData with rank and score from stats
+      setUserData(prev => prev ? {
+        ...prev,
+        national_rank: stats.national_rank ?? prev.national_rank,
+        ai_score: stats.current_ai_score ?? stats.average_score ?? prev.ai_score,
+      } : prev);
     }
-  };
+    
+    // Set connection stats
+    setConnectionStats({
+      total: connResponse?.data?.length || 0,
+      pending: reqResponse?.data?.length || 0,
+    });
+    
+  } catch (error) {
+    console.error('Error loading own profile:', error);
+  }
+};
 
   const loadOwnAssessmentStats = async () => {
     try {
@@ -252,82 +291,84 @@ export default function ProfileScreen() {
   // LOAD OTHER USER PROFILE
   // ============================================
   const loadOtherUserProfile = async (userId: number) => {
-    try {
-      if (passedAthleteData) {
-        setUserData({
-          id: passedAthleteData.id,
-          name: passedAthleteData.name,
-          email: passedAthleteData.email || '',
-          phone: passedAthleteData.phone,
-          role: passedAthleteData.role || 'athlete',
-          sport: passedAthleteData.sport,
-          location: passedAthleteData.location,
-          age: passedAthleteData.age,
-          bio: passedAthleteData.bio,
-          height: passedAthleteData.height,
-          weight: passedAthleteData.weight,
-          achievements: passedAthleteData.achievements,
-          profile_image: passedAthleteData.profile_photo,
-          profile_photo: passedAthleteData.profile_photo,
-          ai_score: passedAthleteData.ai_score,
-          national_rank: passedAthleteData.national_rank,
-          is_online: passedAthleteData.is_online,
-          is_verified: passedAthleteData.is_verified,
-        });
-        setProfileImage(passedAthleteData.profile_photo);
-        setConnectionStatus(passedAthleteData.connection_status || null);
-      }
+  try {
+    if (passedAthleteData) {
+      setUserData({
+        id: passedAthleteData.id,
+        name: passedAthleteData.name,
+        email: passedAthleteData.email || '',
+        phone: passedAthleteData.phone,
+        role: passedAthleteData.role || 'athlete',
+        sport: passedAthleteData.sport,
+        location: passedAthleteData.location,
+        age: passedAthleteData.age,
+        bio: passedAthleteData.bio,
+        height: passedAthleteData.height,
+        weight: passedAthleteData.weight,
+        achievements: passedAthleteData.achievements,
+        profile_image: passedAthleteData.profile_photo,
+        profile_photo: passedAthleteData.profile_photo,
+        ai_score: passedAthleteData.ai_score,
+        national_rank: passedAthleteData.national_rank,
+        is_online: passedAthleteData.is_online,
+        is_verified: passedAthleteData.is_verified,
+      });
+      // Use getImageUrlWithFallback
+      setProfileImage(getImageUrlWithFallback(passedAthleteData.profile_photo, passedAthleteData.name));
+      setConnectionStatus(passedAthleteData.connection_status || null);
+    }
+    
+    const response = await ApiService.makeAuthenticatedRequest(`/users/${userId}`);
+    
+    if (response?.user) {
+      const user = response.user;
+      setUserData({
+        id: user.id,
+        name: user.name,
+        email: user.email || '',
+        phone: user.phone,
+        role: user.role || 'athlete',
+        sport: user.sport,
+        location: user.location,
+        age: user.age,
+        bio: user.bio,
+        height: user.height,
+        weight: user.weight,
+        achievements: user.achievements,
+        profile_image: user.profile_photo || user.profile_image,
+        profile_photo: user.profile_photo,
+        ai_score: user.ai_score,
+        national_rank: user.national_rank,
+        is_online: user.is_online,
+        is_verified: user.is_verified,
+      });
       
-      const response = await ApiService.makeAuthenticatedRequest(`/users/${userId}`);
+      // Use getImageUrlWithFallback with name
+      setProfileImage(getImageUrlWithFallback(
+        user.profile_photo || user.profile_image,
+        user.name || 'User'
+      ));
       
-      if (response?.user) {
-        const user = response.user;
-        setUserData({
-          id: user.id,
-          name: user.name,
-          email: user.email || '',
-          phone: user.phone,
-          role: user.role || 'athlete',
-          sport: user.sport,
-          location: user.location,
-          age: user.age,
-          bio: user.bio,
-          height: user.height,
-          weight: user.weight,
-          achievements: user.achievements,
-          profile_image: user.profile_photo || user.profile_image,
-          profile_photo: user.profile_photo,
-          ai_score: user.ai_score,
-          national_rank: user.national_rank,
-          is_online: user.is_online,
-          is_verified: user.is_verified,
-        });
-        
-        if (user.profile_photo || user.profile_image) {
-          setProfileImage(getImageUrl(user.profile_photo || user.profile_image));
-        }
-        
-        setConnectionStatus(response.connection_status || null);
-        
-        if (user.connection_count !== undefined) {
-          setConnectionStats(prev => ({ ...prev, total: user.connection_count }));
-        }
-      }
+      setConnectionStatus(response.connection_status || null);
       
-      await Promise.all([
-        loadOtherUserPosts(userId),
-        loadOtherUserAssessmentStats(userId),
-      ]);
-      
-    } catch (error) {
-      console.error('Error:', error);
-      if (!passedAthleteData) {
-        Alert.alert('Error', 'Failed to load profile');
-        navigation.goBack();
+      if (user.connection_count !== undefined) {
+        setConnectionStats(prev => ({ ...prev, total: user.connection_count }));
       }
     }
-  };
-
+    
+    await Promise.all([
+      loadOtherUserPosts(userId),
+      loadOtherUserAssessmentStats(userId),
+    ]);
+    
+  } catch (error) {
+    console.error('Error:', error);
+    if (!passedAthleteData) {
+      Alert.alert('Error', 'Failed to load profile');
+      navigation.goBack();
+    }
+  }
+};
   const loadOtherUserPosts = async (userId: number) => {
     try {
       setPostsLoading(true);
@@ -542,7 +583,15 @@ export default function ProfileScreen() {
   // ============================================
   // RENDER: Profile Header
   // ============================================
-  const renderProfileHeader = () => (
+  const renderProfileHeader = () => {
+  // Get display values with proper fallbacks
+  const displayAiScore = userData?.ai_score ?? assessmentStats?.current_ai_score ?? null;
+  const displayRank = userData?.national_rank ?? assessmentStats?.national_rank ?? null;
+  
+  // Debug log
+  console.log('Profile Header - displayRank:', displayRank, 'displayAiScore:', displayAiScore);
+  
+  return (
     <Animated.View entering={FadeInDown.duration(600)} style={styles.profileHeader}>
       <LinearGradient
         colors={[Theme.colors.primary + '30', Theme.colors.secondary + '20', 'transparent']}
@@ -584,11 +633,11 @@ export default function ProfileScreen() {
       
       {userData?.bio && <Text style={styles.bioText}>{userData.bio}</Text>}
 
-      {/* Stats Row */}
+      {/* Stats Row - FIXED */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            {userData?.ai_score?.toFixed(0) || assessmentStats?.current_ai_score?.toFixed(0) || '--'}%
+            {displayAiScore !== null ? `${Math.round(displayAiScore)}%` : '--'}
           </Text>
           <Text style={styles.statLabel}>AI Score</Text>
         </View>
@@ -597,7 +646,7 @@ export default function ProfileScreen() {
         
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            #{userData?.national_rank || assessmentStats?.national_rank || '--'}
+            {displayRank !== null ? `#${displayRank}` : '--'}
           </Text>
           <Text style={styles.statLabel}>Rank</Text>
         </View>
@@ -667,6 +716,7 @@ export default function ProfileScreen() {
       )}
     </Animated.View>
   );
+};
 
   // ============================================
   // RENDER: Tabs
@@ -704,7 +754,13 @@ export default function ProfileScreen() {
   // ============================================
   // RENDER: Overview Tab
   // ============================================
-  const renderOverviewTab = () => (
+  const renderOverviewTab = () => {
+  // Get display values with proper fallbacks
+  const displayAiScore = userData?.ai_score ?? assessmentStats?.current_ai_score ?? null;
+  const displayRank = userData?.national_rank ?? assessmentStats?.national_rank ?? null;
+  const totalAthletes = assessmentStats?.total_athletes ?? 0;
+  const displayAvgScore = assessmentStats?.average_score ?? null;
+  return (
     <Animated.View entering={FadeIn.duration(400)} style={styles.tabContent}>
       {/* AI Score Card */}
       <GlassmorphicCard style={styles.scoreCard}>
@@ -720,7 +776,7 @@ export default function ProfileScreen() {
                 {isOwnProfile ? 'Your AI Score' : `${userData?.name?.split(' ')[0]}'s AI Score`}
               </Text>
               <Text style={styles.scoreCardValue}>
-                {userData?.ai_score?.toFixed(1) || assessmentStats?.current_ai_score?.toFixed(1) || '0'}%
+                {displayAiScore !== null ? `${displayAiScore.toFixed(1)}%` : '0%'}
               </Text>
               <Text style={styles.scoreCardSubtext}>Average of best scores per test type</Text>
             </View>
@@ -731,12 +787,17 @@ export default function ProfileScreen() {
         </LinearGradient>
       </GlassmorphicCard>
 
-      {/* Quick Stats Grid */}
+      {/* Quick Stats Grid - FIXED */}
       <View style={styles.quickStatsGrid}>
         <View style={styles.quickStatCard}>
           <Ionicons name="trophy" size={24} color={Theme.colors.accent} />
-          <Text style={styles.quickStatValue}>#{userData?.national_rank || '--'}</Text>
+          <Text style={styles.quickStatValue}>
+            {displayRank !== null ? `#${displayRank}` : '--'}
+          </Text>
           <Text style={styles.quickStatLabel}>National Rank</Text>
+          {totalAthletes > 0 && (
+            <Text style={styles.quickStatSubLabel}>of {totalAthletes}</Text>
+          )}
         </View>
         
         <View style={styles.quickStatCard}>
@@ -753,7 +814,9 @@ export default function ProfileScreen() {
         
         <View style={styles.quickStatCard}>
           <Ionicons name="star" size={24} color="#FFD700" />
-          <Text style={styles.quickStatValue}>{assessmentStats?.average_score?.toFixed(0) || '--'}%</Text>
+          <Text style={styles.quickStatValue}>
+            {assessmentStats?.average_score !== null ? `${Math.round(assessmentStats.average_score)}%` : '--'}
+          </Text>
           <Text style={styles.quickStatLabel}>Avg Score</Text>
         </View>
       </View>
@@ -799,7 +862,7 @@ export default function ProfileScreen() {
       )}
     </Animated.View>
   );
-
+};
   // ============================================
   // RENDER: Assessments Tab
   // ============================================
@@ -1433,6 +1496,12 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  // Add to your styles object
+quickStatSubLabel: {
+  fontSize: 10,
+  color: Theme.colors.textSecondary,
+  marginTop: 2,
+},
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

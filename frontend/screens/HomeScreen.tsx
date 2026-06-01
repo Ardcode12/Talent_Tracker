@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Share,
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -28,6 +29,7 @@ import { useScrollAnimations } from '../hooks/useScrollAnimations';
 import { FloatingActionMenu } from '../components/FloatingActionMenu';
 import SearchModal from '../components/SearchModal';
 import NotificationsDropdown from '../components/NotificationsDropdown';
+import { PostOptionsModal } from '../components/PostOptionsModal';
 import { 
   getFeedPosts, 
   getTrendingAthletes, 
@@ -42,6 +44,7 @@ import {
   getImageUrl,
   getUnreadCount,
   getNotificationCount,
+  sharePost,
 } from '../services/api';
 import ApiService from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -69,6 +72,7 @@ interface FeedPost {
   comments_count: number;
   shares_count: number;
   is_liked: boolean;
+  is_own_post?: boolean;
   created_at: string;
 }
 
@@ -101,12 +105,16 @@ export default function HomeScreen({ navigation }) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   
-  // New state
+  // Search & Notifications state
   const [showSearch, setShowSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
+  // Post Options Modal state
+  const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
+  const [showPostOptions, setShowPostOptions] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -228,6 +236,54 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  // Handle post deletion from modal
+  const handlePostDeleted = (postId: string) => {
+    setFeedData(prev => prev.filter(post => post.id !== postId));
+  };
+
+  // Handle share post
+  const handleSharePost = async (post: FeedPost) => {
+    try {
+      const shareLink = `https://talenttracker.app/post/${post.id}`;
+      
+      const result = await Share.share({
+        message: Platform.OS === 'ios' 
+          ? post.content.text 
+          : `${post.content.text}\n\n${shareLink}`,
+        url: Platform.OS === 'ios' ? shareLink : undefined,
+        title: `Post by ${post.user.name}`,
+      });
+
+      // Track share if successful
+      if (result.action === Share.sharedAction) {
+        try {
+          await sharePost(post.id, 'external');
+          // Update local share count
+          setFeedData(prev => prev.map(p => 
+            p.id === post.id 
+              ? { ...p, shares_count: p.shares_count + 1 }
+              : p
+          ));
+        } catch (e) {
+          // Silently fail tracking
+        }
+      }
+    } catch (error) {
+      console.error('Share error:', error);
+    }
+  };
+
+  // Handle edit post
+  const handleEditPost = (postId: string) => {
+    const post = feedData.find(p => p.id === postId);
+    if (post) {
+      navigation.navigate('EditPost', { 
+        postId,
+        currentText: post.content.text 
+      });
+    }
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -312,13 +368,12 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Profile')}
             style={styles.profileTouchable}
           >
-            // In renderUserGreeting() - around line 270
-<Image
-  source={{ 
-    uri: getImageUrlWithFallback(userStats?.profilePhoto, userStats?.name || 'Athlete')
-  }}
-  style={styles.greetingAvatar}
-/>
+            <Image
+              source={{ 
+                uri: getImageUrlWithFallback(userStats?.profilePhoto, userStats?.name || 'Athlete')
+              }}
+              style={styles.greetingAvatar}
+            />
             <View style={styles.onlineIndicatorSmall} />
           </TouchableOpacity>
           <View style={styles.greetingTextContainer}>
@@ -352,7 +407,7 @@ export default function HomeScreen({ navigation }) {
             </View>
           </TouchableOpacity>
           
-          {/* AI Score - Direct from Assessment */}
+          {/* AI Score */}
           <TouchableOpacity 
             style={styles.statItem}
             onPress={() => navigation.navigate('Assessments')}
@@ -413,13 +468,12 @@ export default function HomeScreen({ navigation }) {
     >
       <View style={styles.postInput}>
         <View style={styles.postInputContent}>
-          // In renderPostInput() - around line 320
-<Image
-  source={{ 
-    uri: getImageUrlWithFallback(userStats?.profilePhoto, userStats?.name || 'Athlete')
-  }}
-  style={styles.postInputAvatar}
-/>
+          <Image
+            source={{ 
+              uri: getImageUrlWithFallback(userStats?.profilePhoto, userStats?.name || 'Athlete')
+            }}
+            style={styles.postInputAvatar}
+          />
           <Text style={styles.postInputText}>
             Share your performance, achievement or update...
           </Text>
@@ -535,131 +589,149 @@ export default function HomeScreen({ navigation }) {
   // ==========================================
   // RENDER: FEED POST
   // ==========================================
-  const renderFeedPost = ({ item }: { item: FeedPost }) => (
-    <View style={styles.postContainer}>
-      <View style={styles.postCard}>
-        {/* Header */}
-        <View style={styles.postHeader}>
-          
-<TouchableOpacity 
-  style={styles.profileContainer}
-  onPress={() => {
-    if (item.user.id.toString() !== currentUserId?.toString()) {
-      // Navigate to OTHER user's profile
-      navigation.navigate('UserProfile', { userId: parseInt(item.user.id) });
-    }
-    // Don't navigate anywhere for own posts - user can use Profile tab
-  }}
->
-            
-<Image 
-  source={{ 
-    uri: getImageUrlWithFallback(item.user.profile_photo, item.user.name) 
-  }} 
-  style={styles.profilePhoto}
-/>
-            {item.is_ai_verified && (
-              <View style={styles.verifiedIndicator}>
-                <Ionicons name="checkmark" size={10} color={Theme.colors.text} />
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          <View style={styles.postUserInfo}>
-            <View style={styles.userNameRow}>
-              <Text style={styles.userName}>{item.user.name}</Text>
-              {item.user.id !== currentUserId?.toString() && (
-                <TouchableOpacity 
-                  style={styles.miniConnectButton}
-                  onPress={() => handleConnect(item.user.id)}
-                >
-                  <Ionicons name="person-add" size={14} color={Theme.colors.primary} />
-                </TouchableOpacity>
-              )}
-            </View>
-            <Text style={styles.userMeta}>
-              {item.user.sport || 'Athlete'} • {item.user.location || 'India'} • {formatTimeAgo(item.created_at)}
-            </Text>
-          </View>
-          
-          <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Content */}
-        <Text style={styles.postText}>{item.content.text}</Text>
-        
-        {/* AI Verified Badge */}
-        {item.is_ai_verified && (
-          <View style={styles.aiVerifiedBadge}>
-            <LinearGradient
-              colors={[Theme.colors.success, Theme.colors.primary]}
-              style={styles.aiVerifiedGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+  const renderFeedPost = ({ item }: { item: FeedPost }) => {
+    const isOwnPost = item.user.id.toString() === currentUserId?.toString() || item.is_own_post;
+    
+    return (
+      <View style={styles.postContainer}>
+        <View style={styles.postCard}>
+          {/* Header */}
+          <View style={styles.postHeader}>
+            <TouchableOpacity 
+              style={styles.profileContainer}
+              onPress={() => {
+                if (!isOwnPost) {
+                  navigation.navigate('UserProfile', { userId: parseInt(item.user.id) });
+                }
+              }}
             >
-              <Ionicons name="shield-checkmark" size={16} color="#fff" />
-              <Text style={styles.aiVerifiedText}>AI Verified Performance</Text>
-            </LinearGradient>
-          </View>
-        )}
-        
-        {/* Media */}
-        {item.content.media_url && (
-          <TouchableOpacity style={styles.mediaPlaceholder}>
-            <Image 
-              source={{ uri: item.content.media_url }} 
-              style={styles.postMedia}
-              resizeMode="cover"
-            />
-            {item.content.media_type === 'video' && (
-              <View style={styles.playButton}>
-                <Ionicons name="play" size={32} color={Theme.colors.text} />
+              <Image 
+                source={{ 
+                  uri: getImageUrlWithFallback(item.user.profile_photo, item.user.name) 
+                }} 
+                style={styles.profilePhoto}
+              />
+              {item.is_ai_verified && (
+                <View style={styles.verifiedIndicator}>
+                  <Ionicons name="checkmark" size={10} color={Theme.colors.text} />
+                </View>
+              )}
+            </TouchableOpacity>
+            
+            <View style={styles.postUserInfo}>
+              <View style={styles.userNameRow}>
+                <Text style={styles.userName}>{item.user.name}</Text>
+                {!isOwnPost && (
+                  <TouchableOpacity 
+                    style={styles.miniConnectButton}
+                    onPress={() => handleConnect(item.user.id)}
+                  >
+                    <Ionicons name="person-add" size={14} color={Theme.colors.primary} />
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
-          </TouchableOpacity>
-        )}
-        
-        {/* Engagement */}
-        <View style={styles.engagementContainer}>
-          <TouchableOpacity 
-            style={styles.engagementButton}
-            onPress={() => handleLikePost(item.id, item.is_liked)}
-          >
-            <Ionicons 
-              name={item.is_liked ? "heart" : "heart-outline"} 
-              size={24} 
-              color={item.is_liked ? Theme.colors.accent : Theme.colors.text} 
-            />
-            <Text style={[
-              styles.engagementCount,
-              item.is_liked && { color: Theme.colors.accent }
-            ]}>
-              {item.likes_count}
-            </Text>
-          </TouchableOpacity>
+              <Text style={styles.userMeta}>
+                {item.user.sport || 'Athlete'} • {item.user.location || 'India'} • {formatTimeAgo(item.created_at)}
+              </Text>
+            </View>
+            
+            {/* More Options Button */}
+            <TouchableOpacity 
+              style={styles.moreButton}
+              onPress={() => {
+                setSelectedPost(item);
+                setShowPostOptions(true);
+              }}
+            >
+              <Ionicons name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
           
-          <TouchableOpacity 
-            style={styles.engagementButton}
-            onPress={() => navigation.navigate('Comments', { postId: item.id })}
-          >
-            <Ionicons name="chatbubble-outline" size={22} color={Theme.colors.text} />
-            <Text style={styles.engagementCount}>{item.comments_count}</Text>
-          </TouchableOpacity>
+          {/* Content */}
+          <Text style={styles.postText}>{item.content.text}</Text>
           
-          <TouchableOpacity style={styles.engagementButton}>
-            <Ionicons name="share-outline" size={22} color={Theme.colors.text} />
-            <Text style={styles.engagementCount}>{item.shares_count}</Text>
-          </TouchableOpacity>
+          {/* AI Verified Badge */}
+          {item.is_ai_verified && (
+            <View style={styles.aiVerifiedBadge}>
+              <LinearGradient
+                colors={[Theme.colors.success, Theme.colors.primary]}
+                style={styles.aiVerifiedGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Ionicons name="shield-checkmark" size={16} color="#fff" />
+                <Text style={styles.aiVerifiedText}>AI Verified Performance</Text>
+              </LinearGradient>
+            </View>
+          )}
           
-          <TouchableOpacity style={styles.engagementButton}>
-            <Ionicons name="bookmark-outline" size={22} color={Theme.colors.text} />
-          </TouchableOpacity>
+          {/* Media */}
+          {item.content.media_url && (
+            <TouchableOpacity style={styles.mediaPlaceholder}>
+              <Image 
+                source={{ uri: item.content.media_url }} 
+                style={styles.postMedia}
+                resizeMode="cover"
+              />
+              {item.content.media_type === 'video' && (
+                <View style={styles.playButton}>
+                  <Ionicons name="play" size={32} color={Theme.colors.text} />
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+          
+          {/* Engagement */}
+          <View style={styles.engagementContainer}>
+            {/* Like Button */}
+            <TouchableOpacity 
+              style={styles.engagementButton}
+              onPress={() => handleLikePost(item.id, item.is_liked)}
+            >
+              <Ionicons 
+                name={item.is_liked ? "heart" : "heart-outline"} 
+                size={24} 
+                color={item.is_liked ? Theme.colors.accent : Theme.colors.text} 
+              />
+              <Text style={[
+                styles.engagementCount,
+                item.is_liked && { color: Theme.colors.accent }
+              ]}>
+                {item.likes_count}
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Comment Button */}
+            <TouchableOpacity 
+              style={styles.engagementButton}
+              onPress={() => navigation.navigate('Comments', { 
+                postId: item.id,
+                postText: item.content.text,
+                postUserName: item.user.name
+              })}
+            >
+              <Ionicons name="chatbubble-outline" size={22} color={Theme.colors.text} />
+              <Text style={styles.engagementCount}>{item.comments_count}</Text>
+            </TouchableOpacity>
+            
+            {/* Share Button */}
+            <TouchableOpacity 
+              style={styles.engagementButton}
+              onPress={() => handleSharePost(item)}
+            >
+              <Ionicons name="share-outline" size={22} color={Theme.colors.text} />
+              <Text style={styles.engagementCount}>{item.shares_count}</Text>
+            </TouchableOpacity>
+            
+            {/* Bookmark Button */}
+            <TouchableOpacity style={styles.engagementButton}>
+              <Ionicons name="bookmark-outline" size={22} color={Theme.colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   // ==========================================
   // RENDER: TRENDING ATHLETES
@@ -685,16 +757,15 @@ export default function HomeScreen({ navigation }) {
           renderItem={({ item }) => (
             <TouchableOpacity 
               style={styles.athleteCard}
-              onPress={() => navigation.navigate('Profile', { userId: item.id })}
+              onPress={() => navigation.navigate('UserProfile', { userId: item.id })}
             >
               <View style={styles.athleteContent}>
-                // In renderTrendingAthletes() - around line 505
-<Image 
-  source={{ 
-    uri: getImageUrlWithFallback(item.profile_photo, item.name) 
-  }} 
-  style={styles.athletePhoto} 
-/>
+                <Image 
+                  source={{ 
+                    uri: getImageUrlWithFallback(item.profile_photo, item.name) 
+                  }} 
+                  style={styles.athletePhoto} 
+                />
                 <Text style={styles.athleteName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.athleteSport}>{item.sport}</Text>
                 <Text style={styles.athleteStat}>{item.highlight_stat}</Text>
@@ -763,16 +834,15 @@ export default function HomeScreen({ navigation }) {
           {suggestedConnections.map((connection) => (
             <View key={connection.id} style={styles.connectionCard}>
               <TouchableOpacity
-                onPress={() => navigation.navigate('Profile', { userId: connection.id })}
+                onPress={() => navigation.navigate('UserProfile', { userId: connection.id })}
               >
                 <View style={styles.connectionImageContainer}>
-                  // In renderSuggestedConnections() - around line 545
-<Image
-  source={{ 
-    uri: getImageUrlWithFallback(connection.profile_photo, connection.name) 
-  }}
-  style={styles.connectionPhoto}
-/>
+                  <Image
+                    source={{ 
+                      uri: getImageUrlWithFallback(connection.profile_photo, connection.name) 
+                    }}
+                    style={styles.connectionPhoto}
+                  />
                   {connection.is_online && <View style={styles.onlineIndicator} />}
                 </View>
                 <Text style={styles.connectionName} numberOfLines={1}>{connection.name}</Text>
@@ -935,15 +1005,34 @@ export default function HomeScreen({ navigation }) {
       
       <FloatingActionMenu />
       
+      {/* Search Modal */}
       <SearchModal
         visible={showSearch}
         onClose={() => setShowSearch(false)}
         navigation={navigation}
       />
       
+      {/* Notifications Dropdown */}
       <NotificationsDropdown
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}
+        navigation={navigation}
+      />
+
+      {/* Post Options Modal */}
+      <PostOptionsModal
+        visible={showPostOptions}
+        onClose={() => {
+          setShowPostOptions(false);
+          setSelectedPost(null);
+        }}
+        post={selectedPost}
+        currentUserId={currentUserId?.toString()}
+        onPostDeleted={handlePostDeleted}
+        onEditPost={(postId) => {
+          // For now, show alert. You can create an EditPostScreen later
+          Alert.alert('Edit Post', 'Edit feature coming soon!');
+        }}
         navigation={navigation}
       />
     </View>
@@ -1510,7 +1599,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   moreButton: {
-    padding: 4,
+    padding: 8,
   },
   postText: {
     fontSize: 15,

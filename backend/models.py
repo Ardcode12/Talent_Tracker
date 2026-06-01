@@ -1,29 +1,53 @@
 # backend/models.py
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float, Table, UniqueConstraint
-
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 
 
-# Association tables
+# ============================================
+# ASSOCIATION TABLES (Must be defined FIRST)
+# ============================================
+
 post_likes = Table(
     'post_likes',
     Base.metadata,
-    Column('user_id', Integer, ForeignKey('users.id')),
-    Column('post_id', Integer, ForeignKey('posts.id')),
+    Column('user_id', Integer, ForeignKey('users.id', ondelete='CASCADE')),
+    Column('post_id', Integer, ForeignKey('posts.id', ondelete='CASCADE')),
     Column('created_at', DateTime(timezone=True), server_default=func.now())
 )
 
 connections = Table(
     'connections',
     Base.metadata,
-    Column('user_id', Integer, ForeignKey('users.id')),
-    Column('connected_user_id', Integer, ForeignKey('users.id')),
+    Column('user_id', Integer, ForeignKey('users.id', ondelete='CASCADE')),
+    Column('connected_user_id', Integer, ForeignKey('users.id', ondelete='CASCADE')),
     Column('status', String(50), default='pending'),  # pending, accepted, rejected
     Column('created_at', DateTime(timezone=True), server_default=func.now())
 )
 
+# Comment likes table - MUST be defined before Comment class
+comment_likes = Table(
+    'comment_likes',
+    Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id', ondelete='CASCADE')),
+    Column('comment_id', Integer, ForeignKey('comments.id', ondelete='CASCADE')),
+    Column('created_at', DateTime(timezone=True), server_default=func.now())
+)
+
+# Reply likes table - MUST be defined before CommentReply class
+reply_likes = Table(
+    'reply_likes',
+    Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id', ondelete='CASCADE')),
+    Column('reply_id', Integer, ForeignKey('comment_replies.id', ondelete='CASCADE')),
+    Column('created_at', DateTime(timezone=True), server_default=func.now())
+)
+
+
+# ============================================
+# USER MODEL
+# ============================================
 
 class User(Base):
     __tablename__ = "users"
@@ -69,10 +93,7 @@ class User(Base):
     posts = relationship("Post", back_populates="user", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
     liked_posts = relationship("Post", secondary=post_likes, back_populates="liked_by")
-
     performance_data = relationship("PerformanceData", back_populates="user", cascade="all, delete-orphan")
-
-    # ✅ Add assessments relationship
     assessments = relationship("Assessment", back_populates="user", cascade="all, delete-orphan")
 
     # Social connections
@@ -84,19 +105,21 @@ class User(Base):
         backref="connections_received"
     )
 
+
+# ============================================
+# CONVERSATION & MESSAGE MODELS
+# ============================================
+
 class Conversation(Base):
     __tablename__ = "conversations"
     
     id = Column(Integer, primary_key=True, index=True)
-    # For one-on-one conversations
     user1_id = Column(Integer, ForeignKey('users.id'))
     user2_id = Column(Integer, ForeignKey('users.id'))
     
-    # Conversation metadata
     last_message_at = Column(DateTime(timezone=True), nullable=True)
     last_message_preview = Column(String(255), nullable=True)
     
-    # Status
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -105,7 +128,6 @@ class Conversation(Base):
     user2 = relationship("User", foreign_keys=[user2_id], backref="conversations_as_user2")
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
     
-    # Add unique constraint to prevent duplicate conversations
     __table_args__ = (
         UniqueConstraint('user1_id', 'user2_id', name='unique_conversation'),
     )
@@ -118,17 +140,14 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey('conversations.id'), index=True)
     sender_id = Column(Integer, ForeignKey('users.id'))
     
-    # Message content
     text = Column(Text, nullable=False)
     attachment_url = Column(String(500), nullable=True)
-    attachment_type = Column(String(50), nullable=True)  # image, video, document
+    attachment_type = Column(String(50), nullable=True)
     
-    # Status
     is_read = Column(Boolean, default=False)
     read_at = Column(DateTime(timezone=True), nullable=True)
     is_deleted = Column(Boolean, default=False)
     
-    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     edited_at = Column(DateTime(timezone=True), nullable=True)
     
@@ -137,27 +156,27 @@ class Message(Base):
     sender = relationship("User", foreign_keys=[sender_id])
 
 
+# ============================================
+# POST MODEL
+# ============================================
+
 class Post(Base):
     __tablename__ = "posts"
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
 
-    # Content
     text = Column(Text)
     media_url = Column(String(500), nullable=True)
-    media_type = Column(String(50), nullable=True)  # image, video
+    media_type = Column(String(50), nullable=True)
 
-    # Stats
     likes_count = Column(Integer, default=0)
     comments_count = Column(Integer, default=0)
     shares_count = Column(Integer, default=0)
 
-    # AI Verification
     is_ai_verified = Column(Boolean, default=False)
     ai_verification_score = Column(Float, nullable=True)
 
-    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -167,6 +186,10 @@ class Post(Base):
     liked_by = relationship("User", secondary=post_likes, back_populates="liked_posts")
 
 
+# ============================================
+# COMMENT MODEL (with likes and replies support)
+# ============================================
+
 class Comment(Base):
     __tablename__ = "comments"
     
@@ -174,13 +197,70 @@ class Comment(Base):
     post_id = Column(Integer, ForeignKey("posts.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
     text = Column(Text)
+    
+    # Likes count
+    likes_count = Column(Integer, default=0)
+    
+    # Replies count for quick access
+    replies_count = Column(Integer, default=0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     post = relationship("Post", back_populates="comments")
     user = relationship("User", back_populates="comments")
+    replies = relationship(
+        "CommentReply", 
+        back_populates="comment", 
+        cascade="all, delete-orphan",
+        order_by="CommentReply.created_at"
+    )
+    liked_by = relationship(
+        "User", 
+        secondary=comment_likes, 
+        backref="liked_comments"
+    )
 
+
+# ============================================
+# COMMENT REPLY MODEL
+# ============================================
+
+class CommentReply(Base):
+    __tablename__ = "comment_replies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    comment_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    
+    # Reply content
+    text = Column(Text, nullable=False)
+    
+    # Optional: mention another user in reply (@username)
+    reply_to_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    
+    # Stats
+    likes_count = Column(Integer, default=0)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    comment = relationship("Comment", back_populates="replies")
+    user = relationship("User", foreign_keys=[user_id], backref="comment_replies")
+    reply_to_user = relationship("User", foreign_keys=[reply_to_user_id])
+    liked_by = relationship(
+        "User", 
+        secondary=reply_likes, 
+        backref="liked_replies"
+    )
+
+
+# ============================================
+# ANNOUNCEMENT MODEL
+# ============================================
 
 class Announcement(Base):
     __tablename__ = "announcements"
@@ -188,7 +268,7 @@ class Announcement(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255))
     description = Column(Text)
-    icon = Column(String(10), default="📢") # Corrected emoji
+    icon = Column(String(10), default="📢")
     link = Column(String(500), nullable=True)
     priority = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
@@ -197,13 +277,17 @@ class Announcement(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
 
 
+# ============================================
+# ASSESSMENT MODEL
+# ============================================
+
 class Assessment(Base):
     __tablename__ = "assessments"
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
 
-    test_type = Column(String(100))          # e.g. Vertical Jump, Squats
+    test_type = Column(String(100))
     video_url = Column(String(500), nullable=True)
     score = Column(Float, nullable=True)
     ai_score = Column(Float, nullable=True)
@@ -212,19 +296,128 @@ class Assessment(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationship back to User
+    # Relationship
     user = relationship("User", back_populates="assessments")
 
+
+# ============================================
+# PERFORMANCE DATA MODEL
+# ============================================
 
 class PerformanceData(Base):
     __tablename__ = "performance_data"
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    metric_type = Column(String(100))  # speed, strength, endurance, etc.
+    metric_type = Column(String(100))
     value = Column(Float)
-    unit = Column(String(50))  # seconds, kg, meters, etc.
+    unit = Column(String(50))
 
     recorded_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="performance_data")
+
+
+# ============================================
+# EVENT MODEL
+# ============================================
+
+class Event(Base):
+    __tablename__ = "events"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Event creator (coach)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Event details
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    event_type = Column(String(100), nullable=False)
+    sport = Column(String(100), nullable=True)
+    
+    # Location
+    location = Column(String(255), nullable=True)
+    venue = Column(String(255), nullable=True)
+    is_online = Column(Boolean, default=False)
+    online_link = Column(String(500), nullable=True)
+    
+    # Dates
+    start_date = Column(DateTime(timezone=True), nullable=False)
+    end_date = Column(DateTime(timezone=True), nullable=True)
+    registration_deadline = Column(DateTime(timezone=True), nullable=True)
+    
+    # Capacity
+    max_participants = Column(Integer, nullable=True)
+    current_participants = Column(Integer, default=0)
+    
+    # Requirements
+    min_age = Column(Integer, nullable=True)
+    max_age = Column(Integer, nullable=True)
+    min_ai_score = Column(Float, nullable=True)
+    eligibility_criteria = Column(Text, nullable=True)
+    
+    # Media
+    banner_image = Column(String(500), nullable=True)
+    
+    # Status & Approval
+    status = Column(String(50), default="pending")
+    approval_status = Column(String(50), default="pending")
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+    
+    # Visibility
+    is_public = Column(Boolean, default=True)
+    is_featured = Column(Boolean, default=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    creator = relationship("User", foreign_keys=[created_by], backref="created_events")
+    approver = relationship("User", foreign_keys=[approved_by], backref="approved_events")
+
+
+# ============================================
+# EVENT REGISTRATION MODEL
+# ============================================
+
+class EventRegistration(Base):
+    __tablename__ = "event_registrations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    status = Column(String(50), default="registered")
+    registered_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    event = relationship("Event", backref="registrations")
+    user = relationship("User", backref="event_registrations")
+    
+    __table_args__ = (
+        UniqueConstraint('event_id', 'user_id', name='unique_event_registration'),
+    )
+
+
+# ============================================
+# ADMIN USER MODEL
+# ============================================
+
+class AdminUser(Base):
+    __tablename__ = "admin_users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=False)
+    role = Column(String(50), default="admin")
+    
+    is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime(timezone=True), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

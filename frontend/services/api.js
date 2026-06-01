@@ -13,8 +13,8 @@ const getApiUrl = () => {
     // Replace this with YOUR computer's IP address
     // To find your IP on Windows: run 'ipconfig' in cmd
     // Look for IPv4 Address under your active network adapter
-    
-    return 'http://10.174.246.35:8000'; // UPDATE THIS WITH YOUR IP
+
+    return 'http://10.61.77.35:8000'; // UPDATE THIS WITH YOUR IP
   }
 };
 
@@ -38,14 +38,14 @@ console.log('Base URL:', BASE_URL);
  */
 const generateAvatarUrl = (name = 'User', size = 128) => {
   const safeName = encodeURIComponent(name || 'User');
-  
+
   // Color palette matching backend
   const colors = [
-    "6366f1", "8b5cf6", "ec4899", "f43f5e", 
+    "6366f1", "8b5cf6", "ec4899", "f43f5e",
     "f97316", "eab308", "22c55e", "14b8a6",
     "06b6d4", "3b82f6", "a855f7", "d946ef"
   ];
-  
+
   // Generate consistent color from name
   let hash = 0;
   const nameStr = name || 'User';
@@ -53,7 +53,7 @@ const generateAvatarUrl = (name = 'User', size = 128) => {
     hash += nameStr.charCodeAt(i);
   }
   const bgColor = colors[hash % colors.length];
-  
+
   return `https://ui-avatars.com/api/?background=${bgColor}&color=fff&name=${safeName}&size=${size}&bold=true`;
 };
 
@@ -64,69 +64,44 @@ const generateAvatarUrl = (name = 'User', size = 128) => {
  * @returns {string|null} Full URL to image or null
  */
 export const getImageUrl = (imagePath, fallbackName = null) => {
-  // If no image path, generate avatar if we have a name, otherwise return null
-  if (!imagePath) {
+  if (!imagePath || imagePath === 'null' || imagePath === 'undefined') {
     return fallbackName ? generateAvatarUrl(fallbackName) : null;
   }
-  
-  // Check for invalid paths
-  if (imagePath === 'null' || imagePath === 'undefined') {
-    return fallbackName ? generateAvatarUrl(fallbackName) : null;
-  }
-  
-  // Trim and check for empty string
+
   const trimmedPath = String(imagePath).trim();
   if (trimmedPath === '') {
     return fallbackName ? generateAvatarUrl(fallbackName) : null;
   }
-  
-  // If it's already a full URL, return as is
+
+  // If the backend sent a localhost URL, replace it with our actual BASE_URL
+  if (trimmedPath.includes('localhost:8000')) {
+    return trimmedPath.replace(/http:\/\/localhost:8000/g, BASE_URL);
+  }
+
   if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
     return trimmedPath;
   }
-  
-  // Build full URL from relative path
-  if (trimmedPath.startsWith('/')) {
-    return `${BASE_URL}${trimmedPath}`;
-  }
-  
-  return `${BASE_URL}/${trimmedPath}`;
+
+  return trimmedPath.startsWith('/') ? `${BASE_URL}${trimmedPath}` : `${BASE_URL}/${trimmedPath}`;
 };
 
-/**
- * Get image URL with guaranteed fallback (never returns null)
- * @param {string|null} imagePath - The image path from backend
- * @param {string} name - Name to use for generating avatar
- * @param {number} size - Size of fallback avatar
- * @returns {string} Full URL to image or generated avatar
- */
 export const getImageUrlWithFallback = (imagePath, name = 'User', size = 128) => {
-  // Check if we have a valid image path
-  if (imagePath) {
-    // Check for invalid string values
-    if (imagePath === 'null' || imagePath === 'undefined') {
-      return generateAvatarUrl(name, size);
-    }
-    
+  if (imagePath && imagePath !== 'null' && imagePath !== 'undefined') {
     const trimmedPath = String(imagePath).trim();
-    if (trimmedPath === '') {
-      return generateAvatarUrl(name, size);
+    if (trimmedPath !== '') {
+      // If the backend sent a localhost URL, replace it with our actual BASE_URL
+      if (trimmedPath.includes('localhost:8000')) {
+        return trimmedPath.replace(/http:\/\/localhost:8000/g, BASE_URL);
+      }
+
+      if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+        return trimmedPath;
+      }
+
+      return trimmedPath.startsWith('/') ? `${BASE_URL}${trimmedPath}` : `${BASE_URL}/${trimmedPath}`;
     }
-    
-    // If it's already a full URL, return as is
-    if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
-      return trimmedPath;
-    }
-    
-    // Build full URL from relative path
-    if (trimmedPath.startsWith('/')) {
-      return `${BASE_URL}${trimmedPath}`;
-    }
-    
-    return `${BASE_URL}/${trimmedPath}`;
   }
-  
-  // Generate avatar with initials
+
   return generateAvatarUrl(name, size);
 };
 
@@ -135,17 +110,17 @@ export const getImageUrlWithFallback = (imagePath, name = 'User', size = 128) =>
 // ============================================================================
 
 class ApiService {
-  
+
   // ==========================================
   // AUTHENTICATION METHODS
   // ==========================================
-  
+
   static async login(email, password) {
     try {
       const url = `${API_BASE_URL}/auth/login`;
       console.log('Login URL:', url);
       console.log('Login attempt for:', email);
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -156,7 +131,7 @@ class ApiService {
 
       const text = await response.text();
       console.log('Response status:', response.status);
-      
+
       let data;
       try {
         data = JSON.parse(text);
@@ -191,11 +166,150 @@ class ApiService {
     }
   }
 
+  // frontend/services/api.js
+  // Add these methods inside the ApiService class
+
+  // ==========================================
+  // COMMENT LIKES
+  // ==========================================
+
+  static async likeComment(postId, commentId) {
+    try {
+      return await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments/${commentId}/like`,
+        { method: 'POST' }
+      );
+    } catch (error) {
+      console.error('Error liking comment:', error);
+      throw error;
+    }
+  }
+
+  static async unlikeComment(postId, commentId) {
+    try {
+      return await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments/${commentId}/unlike`,
+        { method: 'DELETE' }
+      );
+    } catch (error) {
+      console.error('Error unliking comment:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // COMMENT REPLIES
+  // ==========================================
+
+  static async getReplies(postId, commentId, page = 1, limit = 10) {
+    try {
+      const response = await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments/${commentId}/replies?page=${page}&limit=${limit}`
+      );
+
+      if (response.data && Array.isArray(response.data)) {
+        response.data = response.data.map(reply => ({
+          ...reply,
+          user: reply.user ? {
+            ...reply.user,
+            profile_photo: getImageUrlWithFallback(reply.user.profile_photo, reply.user.name)
+          } : null,
+          reply_to_user: reply.reply_to_user ? {
+            ...reply.reply_to_user,
+            profile_photo: getImageUrlWithFallback(reply.reply_to_user.profile_photo, reply.reply_to_user.name)
+          } : null
+        }));
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error fetching replies:', error);
+      return { data: [], total: 0, has_more: false };
+    }
+  }
+
+  static async addReply(postId, commentId, text, replyToUserId = null) {
+    try {
+      const formData = new FormData();
+      formData.append('text', text);
+      if (replyToUserId) {
+        formData.append('reply_to_user_id', replyToUserId.toString());
+      }
+
+      const token = await this.getAuthToken();
+      const response = await fetch(
+        `${API_BASE_URL}/posts/${postId}/comments/${commentId}/replies`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to add reply');
+      }
+
+      // Process the returned reply
+      if (data.reply && data.reply.user) {
+        data.reply.user.profile_photo = getImageUrlWithFallback(
+          data.reply.user.profile_photo,
+          data.reply.user.name
+        );
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error adding reply:', error);
+      throw error;
+    }
+  }
+
+  static async deleteReply(postId, commentId, replyId) {
+    try {
+      return await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments/${commentId}/replies/${replyId}`,
+        { method: 'DELETE' }
+      );
+    } catch (error) {
+      console.error('Error deleting reply:', error);
+      throw error;
+    }
+  }
+
+  static async likeReply(postId, commentId, replyId) {
+    try {
+      return await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments/${commentId}/replies/${replyId}/like`,
+        { method: 'POST' }
+      );
+    } catch (error) {
+      console.error('Error liking reply:', error);
+      throw error;
+    }
+  }
+
+  static async unlikeReply(postId, commentId, replyId) {
+    try {
+      return await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments/${commentId}/replies/${replyId}/unlike`,
+        { method: 'DELETE' }
+      );
+    } catch (error) {
+      console.error('Error unliking reply:', error);
+      throw error;
+    }
+  }
+
   static async signup(userData) {
     try {
       const url = `${API_BASE_URL}/auth/signup`;
       console.log('Signup URL:', url);
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -206,7 +320,7 @@ class ApiService {
 
       const text = await response.text();
       console.log('Response status:', response.status);
-      
+
       let data;
       try {
         data = JSON.parse(text);
@@ -244,10 +358,10 @@ class ApiService {
   static async logout() {
     try {
       await AsyncStorage.multiRemove([
-        'authToken', 
-        'userData', 
-        'isLoggedIn', 
-        'profileCompleted', 
+        'authToken',
+        'userData',
+        'isLoggedIn',
+        'profileCompleted',
         'userRole'
       ]);
       return true;
@@ -270,125 +384,125 @@ class ApiService {
   // ==========================================
   // HELPER METHODS
   // ==========================================
-// ============================================
-// ALL ATHLETES METHODS (For Coach Dashboard)
-// ============================================
+  // ============================================
+  // ALL ATHLETES METHODS (For Coach Dashboard)
+  // ============================================
 
-static async getAllAthletes(params = {}) {
-  try {
-    const token = await this.getAuthToken();
-    if (!token) {
+  static async getAllAthletes(params = {}) {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { data: [], pagination: {} };
+      }
+
+      const queryParams = new URLSearchParams();
+      if (params.search) queryParams.append('search', params.search);
+      if (params.sport) queryParams.append('sport', params.sport);
+      if (params.min_score) queryParams.append('min_score', params.min_score);
+      if (params.sort_by) queryParams.append('sort_by', params.sort_by);
+      if (params.sort_order) queryParams.append('sort_order', params.sort_order);
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.limit) queryParams.append('limit', params.limit.toString());
+
+      const url = `/coach/all-athletes?${queryParams.toString()}`;
+      const response = await this.makeAuthenticatedRequest(url);
+
+      // Process image URLs
+      if (response.data && Array.isArray(response.data)) {
+        response.data = response.data.map(athlete => ({
+          ...athlete,
+          profile_photo: getImageUrlWithFallback(athlete.profile_photo, athlete.name)
+        }));
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error fetching all athletes:', error);
       return { data: [], pagination: {} };
     }
-    
-    const queryParams = new URLSearchParams();
-    if (params.search) queryParams.append('search', params.search);
-    if (params.sport) queryParams.append('sport', params.sport);
-    if (params.min_score) queryParams.append('min_score', params.min_score);
-    if (params.sort_by) queryParams.append('sort_by', params.sort_by);
-    if (params.sort_order) queryParams.append('sort_order', params.sort_order);
-    if (params.page) queryParams.append('page', params.page.toString());
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    
-    const url = `/coach/all-athletes?${queryParams.toString()}`;
-    const response = await this.makeAuthenticatedRequest(url);
-    
-    // Process image URLs
-    if (response.data && Array.isArray(response.data)) {
-      response.data = response.data.map(athlete => ({
-        ...athlete,
-        profile_photo: getImageUrlWithFallback(athlete.profile_photo, athlete.name)
-      }));
-    }
-    
-    return response;
-  } catch (error) {
-    console.error('Error fetching all athletes:', error);
-    return { data: [], pagination: {} };
   }
-}
 
-static async getTopAthletes(limit = 10, sport = null) {
-  try {
-    const token = await this.getAuthToken();
-    if (!token) {
+  static async getTopAthletes(limit = 10, sport = null) {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { data: [] };
+      }
+
+      const params = new URLSearchParams({ limit: limit.toString() });
+      if (sport) params.append('sport', sport);
+
+      const response = await this.makeAuthenticatedRequest(`/coach/top-athletes?${params}`);
+
+      // Process image URLs
+      if (response.data && Array.isArray(response.data)) {
+        response.data = response.data.map(athlete => ({
+          ...athlete,
+          profile_photo: getImageUrlWithFallback(athlete.profile_photo, athlete.name)
+        }));
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error fetching top athletes:', error);
       return { data: [] };
     }
-    
-    const params = new URLSearchParams({ limit: limit.toString() });
-    if (sport) params.append('sport', sport);
-    
-    const response = await this.makeAuthenticatedRequest(`/coach/top-athletes?${params}`);
-    
-    // Process image URLs
-    if (response.data && Array.isArray(response.data)) {
-      response.data = response.data.map(athlete => ({
-        ...athlete,
-        profile_photo: getImageUrlWithFallback(athlete.profile_photo, athlete.name)
-      }));
-    }
-    
-    return response;
-  } catch (error) {
-    console.error('Error fetching top athletes:', error);
-    return { data: [] };
   }
-}
 
-static async getActiveAthletes(hours = 24, limit = 10) {
-  try {
-    const token = await this.getAuthToken();
-    if (!token) {
+  static async getActiveAthletes(hours = 24, limit = 10) {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { data: [] };
+      }
+
+      const response = await this.makeAuthenticatedRequest(
+        `/coach/active-athletes?hours=${hours}&limit=${limit}`
+      );
+
+      // Process image URLs
+      if (response.data && Array.isArray(response.data)) {
+        response.data = response.data.map(athlete => ({
+          ...athlete,
+          profile_photo: getImageUrlWithFallback(athlete.profile_photo, athlete.name)
+        }));
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error fetching active athletes:', error);
       return { data: [] };
     }
-    
-    const response = await this.makeAuthenticatedRequest(
-      `/coach/active-athletes?hours=${hours}&limit=${limit}`
-    );
-    
-    // Process image URLs
-    if (response.data && Array.isArray(response.data)) {
-      response.data = response.data.map(athlete => ({
-        ...athlete,
-        profile_photo: getImageUrlWithFallback(athlete.profile_photo, athlete.name)
-      }));
-    }
-    
-    return response;
-  } catch (error) {
-    console.error('Error fetching active athletes:', error);
-    return { data: [] };
   }
-}
 
-static async getRisingStars(days = 30, limit = 10) {
-  try {
-    const token = await this.getAuthToken();
-    if (!token) {
+  static async getRisingStars(days = 30, limit = 10) {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { data: [] };
+      }
+
+      const response = await this.makeAuthenticatedRequest(
+        `/coach/rising-stars?days=${days}&limit=${limit}`
+      );
+
+      // Process image URLs
+      if (response.data && Array.isArray(response.data)) {
+        response.data = response.data.map(item => ({
+          ...item,
+          athlete: item.athlete ? {
+            ...item.athlete,
+            profile_photo: getImageUrlWithFallback(item.athlete.profile_photo, item.athlete.name)
+          } : null
+        }));
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error fetching rising stars:', error);
       return { data: [] };
     }
-    
-    const response = await this.makeAuthenticatedRequest(
-      `/coach/rising-stars?days=${days}&limit=${limit}`
-    );
-    
-    // Process image URLs
-    if (response.data && Array.isArray(response.data)) {
-      response.data = response.data.map(item => ({
-        ...item,
-        athlete: item.athlete ? {
-          ...item.athlete,
-          profile_photo: getImageUrlWithFallback(item.athlete.profile_photo, item.athlete.name)
-        } : null
-      }));
-    }
-    
-    return response;
-  } catch (error) {
-    console.error('Error fetching rising stars:', error);
-    return { data: [] };
   }
-}
   static async getCurrentUser() {
     try {
       const userData = await AsyncStorage.getItem('userData');
@@ -411,39 +525,39 @@ static async getRisingStars(days = 30, limit = 10) {
   static async makeAuthenticatedRequest(endpoint, options = {}) {
     try {
       const token = await this.getAuthToken();
-      
+
       const publicEndpoints = ['/athletes/trending', '/announcements'];
       const isPublicEndpoint = publicEndpoints.some(ep => endpoint.includes(ep));
-      
+
       if (!token && !isPublicEndpoint) {
         console.warn('No auth token found for authenticated request');
         return { data: [] };
       }
-      
+
       const url = `${API_BASE_URL}${endpoint}`;
       console.log('Authenticated request to:', url);
-      
+
       const headers = {
         'Content-Type': 'application/json',
         ...options.headers,
       };
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      
+
       const response = await fetch(url, {
         ...options,
         headers,
       });
 
       const text = await response.text();
-      
+
       if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
         console.error('Received HTML instead of JSON');
         throw new Error('Server returned HTML instead of JSON');
       }
-      
+
       let data;
       try {
         data = JSON.parse(text);
@@ -473,7 +587,7 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const url = `${API_BASE_URL}${endpoint}`;
       console.log('Public request to:', url);
-      
+
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -512,9 +626,9 @@ static async getRisingStars(days = 30, limit = 10) {
       if (!token) {
         throw new Error('No authentication token found');
       }
-      
+
       const url = `${API_BASE_URL}/users/profile`;
-      
+
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
@@ -524,7 +638,7 @@ static async getRisingStars(days = 30, limit = 10) {
       });
 
       const text = await response.text();
-      
+
       let data;
       try {
         data = JSON.parse(text);
@@ -548,7 +662,7 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const token = await AsyncStorage.getItem('authToken');
       const formData = new FormData();
-      
+
       if (Platform.OS === 'web') {
         const response = await fetch(imageUri);
         const blob = await response.blob();
@@ -570,7 +684,7 @@ static async getRisingStars(days = 30, limit = 10) {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.detail || 'Failed to upload image');
       }
@@ -590,9 +704,9 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const token = await this.getAuthToken();
       if (!token) return null;
-      
+
       const response = await this.makeAuthenticatedRequest('/coach/dashboard-stats');
-      
+
       // Process coach photo
       if (response.coach_info) {
         response.coach_info.profile_photo = getImageUrlWithFallback(
@@ -600,7 +714,7 @@ static async getRisingStars(days = 30, limit = 10) {
           response.coach_info.name
         );
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching coach dashboard stats:', error);
@@ -614,12 +728,12 @@ static async getRisingStars(days = 30, limit = 10) {
       if (!token) {
         return { data: [], pagination: {} };
       }
-      
+
       const queryParams = new URLSearchParams(params).toString();
       const url = queryParams ? `/coach/athletes?${queryParams}` : '/coach/athletes';
-      
+
       const response = await this.makeAuthenticatedRequest(url);
-      
+
       // Process image URLs with fallback names
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(athlete => ({
@@ -630,7 +744,7 @@ static async getRisingStars(days = 30, limit = 10) {
           )
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching coach athletes:', error);
@@ -642,9 +756,9 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const token = await this.getAuthToken();
       if (!token) return null;
-      
+
       const response = await this.makeAuthenticatedRequest(`/coach/athlete/${athleteId}`);
-      
+
       // Process athlete photo
       if (response.athlete) {
         response.athlete.profile_photo = getImageUrlWithFallback(
@@ -652,7 +766,7 @@ static async getRisingStars(days = 30, limit = 10) {
           response.athlete.name
         );
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching athlete details:', error);
@@ -666,12 +780,12 @@ static async getRisingStars(days = 30, limit = 10) {
       if (!token) {
         return { data: [], stats: null };
       }
-      
+
       const queryParams = new URLSearchParams(params).toString();
       const url = queryParams ? `/coach/assessments?${queryParams}` : '/coach/assessments';
-      
+
       const response = await this.makeAuthenticatedRequest(url);
-      
+
       // Process image URLs with athlete names for fallback
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(assessment => ({
@@ -685,7 +799,7 @@ static async getRisingStars(days = 30, limit = 10) {
           } : null
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching coach assessments:', error);
@@ -699,11 +813,11 @@ static async getRisingStars(days = 30, limit = 10) {
       if (!token) {
         return { data: [], total: 0 };
       }
-      
+
       const response = await this.makeAuthenticatedRequest(
         `/coach/dashboard/feed?page=${page}&limit=${limit}`
       );
-      
+
       // Process image URLs
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(post => ({
@@ -721,7 +835,7 @@ static async getRisingStars(days = 30, limit = 10) {
           }
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching coach dashboard feed:', error);
@@ -733,9 +847,9 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const token = await this.getAuthToken();
       if (!token) return null;
-      
+
       const response = await this.makeAuthenticatedRequest('/coach/assessments/statistics');
-      
+
       // Process top performers
       if (response.top_performers) {
         response.top_performers = response.top_performers.map(performer => ({
@@ -746,7 +860,7 @@ static async getRisingStars(days = 30, limit = 10) {
           )
         }));
       }
-      
+
       // Process recent improvements
       if (response.recent_improvements) {
         response.recent_improvements = response.recent_improvements.map(item => ({
@@ -760,7 +874,7 @@ static async getRisingStars(days = 30, limit = 10) {
           } : null
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching assessment statistics:', error);
@@ -771,14 +885,14 @@ static async getRisingStars(days = 30, limit = 10) {
   static async getCoachProfile() {
     try {
       const response = await this.makeAuthenticatedRequest('/coach/profile');
-      
+
       if (response.profile) {
         response.profile.profile_photo = getImageUrlWithFallback(
           response.profile.profile_photo,
           response.profile.name
         );
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching coach profile:', error);
@@ -792,9 +906,9 @@ static async getRisingStars(days = 30, limit = 10) {
       if (!token) {
         throw new Error('No authentication token found');
       }
-      
+
       const url = `${API_BASE_URL}/coach/profile`;
-      
+
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
@@ -835,12 +949,12 @@ static async getRisingStars(days = 30, limit = 10) {
 
       const response = await fetch(`${API_BASE_URL}/assessments/upload`, {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${token}` 
+        headers: {
+          'Authorization': `Bearer ${token}`
         },
         body: formData,
       });
-      
+
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.detail || 'Upload failed');
@@ -859,13 +973,13 @@ static async getRisingStars(days = 30, limit = 10) {
         return { data: [] };
       }
 
-      const url = testType 
+      const url = testType
         ? `${API_BASE_URL}/assessments?test_type=${testType}`
         : `${API_BASE_URL}/assessments`;
 
       const response = await fetch(url, {
-        headers: { 
-          'Authorization': `Bearer ${token}` 
+        headers: {
+          'Authorization': `Bearer ${token}`
         },
       });
 
@@ -897,8 +1011,8 @@ static async getRisingStars(days = 30, limit = 10) {
       }
 
       const response = await fetch(`${API_BASE_URL}/assessments/stats`, {
-        headers: { 
-          'Authorization': `Bearer ${token}` 
+        headers: {
+          'Authorization': `Bearer ${token}`
         },
       });
 
@@ -934,7 +1048,7 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const token = await this.getAuthToken();
       if (!token) {
-        return { 
+        return {
           data: {
             id: null,
             name: 'Guest',
@@ -947,17 +1061,17 @@ static async getRisingStars(days = 30, limit = 10) {
           }
         };
       }
-      
+
       const response = await this.makeAuthenticatedRequest('/users/stats');
-      
+
       if (response.data && response.data.profilePhoto) {
         response.data.profilePhoto = getImageUrl(response.data.profilePhoto);
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching user stats:', error);
-      return { 
+      return {
         data: {
           id: null,
           name: 'Guest',
@@ -976,7 +1090,7 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const token = await this.getAuthToken();
       if (!token) {
-        return { 
+        return {
           data: {
             id: null,
             name: 'Guest',
@@ -990,17 +1104,17 @@ static async getRisingStars(days = 30, limit = 10) {
           }
         };
       }
-      
+
       const response = await this.makeAuthenticatedRequest('/users/stats');
-      
+
       if (response.data && response.data.profilePhoto) {
         response.data.profilePhoto = getImageUrl(response.data.profilePhoto);
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching user stats:', error);
-      return { 
+      return {
         data: {
           id: null,
           name: 'Guest',
@@ -1018,11 +1132,11 @@ static async getRisingStars(days = 30, limit = 10) {
   static async getDetailedStats() {
     try {
       const response = await this.makeAuthenticatedRequest('/users/stats/detailed');
-      
+
       if (response.user && response.user.profilePhoto) {
         response.user.profilePhoto = getImageUrl(response.user.profilePhoto);
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching detailed stats:', error);
@@ -1034,7 +1148,7 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const token = await this.getAuthToken();
       if (!token) {
-        return { 
+        return {
           data: {
             name: 'Guest',
             profilePhoto: null,
@@ -1046,12 +1160,12 @@ static async getRisingStars(days = 30, limit = 10) {
           }
         };
       }
-      
+
       const statsResponse = await this.makeAuthenticatedRequest('/users/stats');
-      
+
       const userData = await AsyncStorage.getItem('userData');
       let rankData = { national_rank: null, total_athletes: 0, percentile: null };
-      
+
       if (userData) {
         const user = JSON.parse(userData);
         try {
@@ -1060,7 +1174,7 @@ static async getRisingStars(days = 30, limit = 10) {
           console.log('Could not fetch rank data');
         }
       }
-      
+
       return {
         data: {
           ...statsResponse.data,
@@ -1072,7 +1186,7 @@ static async getRisingStars(days = 30, limit = 10) {
       };
     } catch (error) {
       console.error('Error fetching enhanced user stats:', error);
-      return { 
+      return {
         data: {
           name: 'Guest',
           profilePhoto: null,
@@ -1095,16 +1209,16 @@ static async getRisingStars(days = 30, limit = 10) {
         limit: limit.toString()
       });
       if (sport) params.append('sport', sport);
-      
+
       const response = await this.makePublicRequest(`/rankings/national?${params}`);
-      
+
       if (response.data) {
         response.data = response.data.map(r => ({
           ...r,
           profile_photo: getImageUrlWithFallback(r.profile_photo, r.name)
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Get rankings error:', error);
@@ -1124,11 +1238,11 @@ static async getRisingStars(days = 30, limit = 10) {
   static async getMyRank() {
     try {
       const response = await this.makeAuthenticatedRequest('/rankings/me');
-      
+
       if (response.profile_photo) {
         response.profile_photo = getImageUrl(response.profile_photo);
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching my rank:', error);
@@ -1162,9 +1276,9 @@ static async getRisingStars(days = 30, limit = 10) {
       if (!token) {
         return { data: [], total: 0, page: 1 };
       }
-      
+
       const response = await this.makeAuthenticatedRequest(`/posts/feed?page=${page}&limit=${limit}`);
-      
+
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(post => ({
           ...post,
@@ -1178,7 +1292,7 @@ static async getRisingStars(days = 30, limit = 10) {
           }
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching feed posts:', error);
@@ -1189,7 +1303,7 @@ static async getRisingStars(days = 30, limit = 10) {
   static async getMyPosts(page = 1, limit = 50) {
     try {
       const response = await this.makeAuthenticatedRequest(`/posts/my-posts?page=${page}&limit=${limit}`);
-      
+
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(post => ({
           ...post,
@@ -1201,7 +1315,7 @@ static async getRisingStars(days = 30, limit = 10) {
           } : null
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching my posts:', error);
@@ -1225,14 +1339,14 @@ static async getRisingStars(days = 30, limit = 10) {
       });
 
       const text = await response.text();
-      
+
       let data;
       try {
         data = JSON.parse(text);
       } catch (e) {
         throw new Error('Invalid response from server');
       }
-      
+
       if (!response.ok) {
         throw new Error(data.detail || 'Failed to create post');
       }
@@ -1266,24 +1380,71 @@ static async getRisingStars(days = 30, limit = 10) {
     }
   }
 
-  static async getComments(postId) {
+  // frontend/services/api.js
+  // Find and REPLACE the getComments method
+
+  static async getComments(postId, page = 1, limit = 50) {
     try {
-      const response = await this.makeAuthenticatedRequest(`/posts/${postId}/comments`);
-      
-      if (response.data && Array.isArray(response.data)) {
-        response.data = response.data.map(comment => ({
-          ...comment,
-          user: comment.user ? {
-            ...comment.user,
-            profile_photo: getImageUrlWithFallback(comment.user.profile_photo, comment.user.name)
-          } : null
-        }));
+      const response = await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments?page=${page}&limit=${limit}`
+      );
+
+      // Handle case where response might be the data directly or wrapped
+      let commentsData = [];
+      let total = 0;
+      let post = null;
+
+      if (response) {
+        // Check if response has data property
+        if (response.data && Array.isArray(response.data)) {
+          commentsData = response.data;
+        } else if (Array.isArray(response)) {
+          // Response is the array directly
+          commentsData = response;
+        }
+
+        total = response.total || commentsData.length;
+        post = response.post || null;
       }
-      
-      return response;
+
+      // Process image URLs
+      commentsData = commentsData.map(comment => ({
+        ...comment,
+        user: comment.user ? {
+          ...comment.user,
+          profile_photo: getImageUrlWithFallback(
+            comment.user.profile_photo,
+            comment.user.name || 'User'
+          )
+        } : null,
+        replies: (comment.replies || []).map(reply => ({
+          ...reply,
+          user: reply.user ? {
+            ...reply.user,
+            profile_photo: getImageUrlWithFallback(
+              reply.user.profile_photo,
+              reply.user.name || 'User'
+            )
+          } : null,
+          reply_to_user: reply.reply_to_user ? {
+            ...reply.reply_to_user,
+            profile_photo: getImageUrlWithFallback(
+              reply.reply_to_user.profile_photo,
+              reply.reply_to_user.name || 'User'
+            )
+          } : null
+        }))
+      }));
+
+      return {
+        data: commentsData,
+        total: total,
+        page: page,
+        post: post
+      };
     } catch (error) {
       console.error('Error fetching comments:', error);
-      return { data: [] };
+      return { data: [], total: 0, page: 1, post: null };
     }
   }
 
@@ -1291,7 +1452,7 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const formData = new FormData();
       formData.append('text', text);
-      
+
       const token = await this.getAuthToken();
       const response = await fetch(`${API_BASE_URL}/posts/${postId}/comments`, {
         method: 'POST',
@@ -1302,7 +1463,7 @@ static async getRisingStars(days = 30, limit = 10) {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.detail || 'Failed to add comment');
       }
@@ -1317,14 +1478,14 @@ static async getRisingStars(days = 30, limit = 10) {
   static async getTrendingAthletes() {
     try {
       const response = await this.makePublicRequest('/athletes/trending');
-      
+
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(athlete => ({
           ...athlete,
           profile_photo: getImageUrlWithFallback(athlete.profile_photo, athlete.name)
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching trending athletes:', error);
@@ -1353,9 +1514,9 @@ static async getRisingStars(days = 30, limit = 10) {
         page: page.toString(),
         limit: limit.toString()
       });
-      
+
       const response = await this.makeAuthenticatedRequest(`/search?${params}`);
-      
+
       if (response.athletes) {
         response.athletes = response.athletes.map(a => ({
           ...a,
@@ -1378,7 +1539,7 @@ static async getRisingStars(days = 30, limit = 10) {
           } : null
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Search error:', error);
@@ -1403,7 +1564,7 @@ static async getRisingStars(days = 30, limit = 10) {
   static async getNotifications(page = 1, limit = 20) {
     try {
       const response = await this.makeAuthenticatedRequest(`/notifications?page=${page}&limit=${limit}`);
-      
+
       if (response.data) {
         response.data = response.data.map(n => ({
           ...n,
@@ -1413,7 +1574,7 @@ static async getRisingStars(days = 30, limit = 10) {
           } : null
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Get notifications error:', error);
@@ -1441,16 +1602,16 @@ static async getRisingStars(days = 30, limit = 10) {
       if (!token) {
         return { data: [] };
       }
-      
+
       const response = await this.makeAuthenticatedRequest('/connections/suggestions');
-      
+
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(connection => ({
           ...connection,
           profile_photo: getImageUrlWithFallback(connection.profile_photo, connection.name)
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching suggested connections:', error);
@@ -1476,7 +1637,7 @@ static async getRisingStars(days = 30, limit = 10) {
   static async getConversations() {
     try {
       const response = await this.makeAuthenticatedRequest('/conversations');
-      
+
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map(conv => ({
           ...conv,
@@ -1486,7 +1647,7 @@ static async getRisingStars(days = 30, limit = 10) {
           } : null
         }));
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -1511,7 +1672,7 @@ static async getRisingStars(days = 30, limit = 10) {
       const response = await this.makeAuthenticatedRequest(
         `/conversations/${conversationId}/messages?page=${page}`
       );
-      
+
       if (response.messages && Array.isArray(response.messages)) {
         response.messages = response.messages.map(msg => ({
           ...msg,
@@ -1522,14 +1683,14 @@ static async getRisingStars(days = 30, limit = 10) {
           attachment_url: getImageUrl(msg.attachment_url)
         }));
       }
-      
+
       if (response.conversation && response.conversation.other_user) {
         response.conversation.other_user.profile_photo = getImageUrlWithFallback(
           response.conversation.other_user.profile_photo,
           response.conversation.other_user.name
         );
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -1540,12 +1701,12 @@ static async getRisingStars(days = 30, limit = 10) {
   static async sendMessage(conversationId, text, attachment = null) {
     try {
       const messageData = { text };
-      
+
       if (attachment) {
         messageData.attachment_url = attachment.url;
         messageData.attachment_type = attachment.type;
       }
-      
+
       return await this.makeAuthenticatedRequest(
         `/conversations/${conversationId}/messages`,
         {
@@ -1619,7 +1780,183 @@ static async getRisingStars(days = 30, limit = 10) {
       return { data: [] };
     }
   }
+  // ==========================================
+  // COMMENT METHODS (Add/Update)
+  // ==========================================
 
+  static async getComments(postId, page = 1, limit = 50) {
+    try {
+      const response = await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments?page=${page}&limit=${limit}`
+      );
+
+      if (response.data && Array.isArray(response.data)) {
+        response.data = response.data.map(comment => ({
+          ...comment,
+          user: comment.user ? {
+            ...comment.user,
+            profile_photo: getImageUrlWithFallback(comment.user.profile_photo, comment.user.name)
+          } : null
+        }));
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      return { data: [], total: 0 };
+    }
+  }
+
+  static async addComment(postId, text) {
+    try {
+      const formData = new FormData();
+      formData.append('text', text);
+
+      const token = await this.getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to add comment');
+      }
+
+      // Process the returned comment
+      if (data.comment && data.comment.user) {
+        data.comment.user.profile_photo = getImageUrlWithFallback(
+          data.comment.user.profile_photo,
+          data.comment.user.name
+        );
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      throw error;
+    }
+  }
+
+  static async deleteComment(postId, commentId) {
+    try {
+      return await this.makeAuthenticatedRequest(
+        `/posts/${postId}/comments/${commentId}`,
+        { method: 'DELETE' }
+      );
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      throw error;
+    }
+  }
+
+  static async updateComment(postId, commentId, text) {
+    try {
+      const formData = new FormData();
+      formData.append('text', text);
+
+      const token = await this.getAuthToken();
+      const response = await fetch(
+        `${API_BASE_URL}/posts/${postId}/comments/${commentId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to update comment');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // POST MANAGEMENT METHODS
+  // ==========================================
+
+  static async deletePost(postId) {
+    try {
+      return await this.makeAuthenticatedRequest(`/posts/${postId}`, {
+        method: 'DELETE'
+      });
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      throw error;
+    }
+  }
+
+  static async updatePost(postId, text) {
+    try {
+      const formData = new FormData();
+      formData.append('text', text);
+
+      const token = await this.getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to update post');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error updating post:', error);
+      throw error;
+    }
+  }
+
+  static async sharePost(postId, shareType = 'external') {
+    try {
+      const formData = new FormData();
+      formData.append('share_type', shareType);
+
+      const token = await this.getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/posts/${postId}/share`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error tracking share:', error);
+      // Don't throw - sharing should still work even if tracking fails
+      return { shares_count: 0 };
+    }
+  }
+
+  static async getPost(postId) {
+    try {
+      return await this.makeAuthenticatedRequest(`/posts/${postId}`);
+    } catch (error) {
+      console.error('Error fetching post:', error);
+      throw error;
+    }
+  }
   // ==========================================
   // TEST CONNECTION
   // ==========================================
@@ -1628,7 +1965,7 @@ static async getRisingStars(days = 30, limit = 10) {
     try {
       const url = `${BASE_URL}/api/health`;
       console.log('Testing connection to:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -1708,7 +2045,14 @@ export const getSearchSuggestions = ApiService.getSearchSuggestions.bind(ApiServ
 // Notifications
 export const getNotifications = ApiService.getNotifications.bind(ApiService);
 export const getNotificationCount = ApiService.getNotificationCount.bind(ApiService);
+// Add these exports at the bottom of api.js (with the other exports)
 
+export const deleteComment = ApiService.deleteComment.bind(ApiService);
+export const updateComment = ApiService.updateComment.bind(ApiService);
+export const deletePost = ApiService.deletePost.bind(ApiService);
+export const updatePost = ApiService.updatePost.bind(ApiService);
+export const sharePost = ApiService.sharePost.bind(ApiService);
+export const getPost = ApiService.getPost.bind(ApiService);
 // Connections
 export const getSuggestedConnections = ApiService.getSuggestedConnections.bind(ApiService);
 export const sendConnectionRequest = ApiService.sendConnectionRequest.bind(ApiService);
@@ -1726,6 +2070,16 @@ export const getUnreadCount = ApiService.getUnreadCount.bind(ApiService);
 export const getAllAthletes = ApiService.getAllAthletes.bind(ApiService);
 export const getTopAthletes = ApiService.getTopAthletes.bind(ApiService);
 export const getActiveAthletes = ApiService.getActiveAthletes.bind(ApiService);
+// Add to exports section at bottom of api.js
+
+// Comment & Reply features
+export const likeComment = ApiService.likeComment.bind(ApiService);
+export const unlikeComment = ApiService.unlikeComment.bind(ApiService);
+export const getReplies = ApiService.getReplies.bind(ApiService);
+export const addReply = ApiService.addReply.bind(ApiService);
+export const deleteReply = ApiService.deleteReply.bind(ApiService);
+export const likeReply = ApiService.likeReply.bind(ApiService);
+export const unlikeReply = ApiService.unlikeReply.bind(ApiService);
 export const getRisingStars = ApiService.getRisingStars.bind(ApiService);
 // Performance
 export const getPerformanceData = ApiService.getPerformanceData.bind(ApiService);

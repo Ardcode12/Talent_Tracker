@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { getImageUrlWithFallback } from '../services/api';
 import { Theme } from '../constants/Theme';
 import {
   getConversations,
@@ -104,20 +105,22 @@ export default function MessagesScreen({ navigation }) {
   };
 
   const renderConversation = ({ item }) => (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={() => navigateToChat(item)}
-    >
-      <View style={styles.avatarContainer}>
-        <Image
-          source={{ 
-            uri: item.other_user?.profile_photo || 'https://via.placeholder.com/50' 
-          }}
-          style={styles.avatar}
-        />
-        {item.is_online && <View style={styles.onlineIndicator} />}
-      </View>
-      
+  <TouchableOpacity
+    style={styles.conversationItem}
+    onPress={() => navigateToChat(item)}
+  >
+    <View style={styles.avatarContainer}>
+      <Image
+        source={{ 
+          uri: getImageUrlWithFallback(
+            item.other_user?.profile_photo, 
+            item.other_user?.name || 'User'
+          )
+        }}
+        style={styles.avatar}
+      />
+      {item.is_online && <View style={styles.onlineIndicator} />}
+    </View>    
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
           <Text style={styles.userName}>{item.other_user?.name || 'Unknown'}</Text>

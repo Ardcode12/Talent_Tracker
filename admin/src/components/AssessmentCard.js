@@ -1,62 +1,84 @@
+// admin/src/components/AssessmentCard.js
 import React from 'react';
-import { FiVideo, FiClock, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import { FiEye, FiCheck, FiX, FiClock } from 'react-icons/fi';
 
 const AssessmentCard = ({ assessment, onView }) => {
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'pending': return 'bg-yellow-500';
-      case 'verified': return 'bg-green-500';
-      case 'rejected': return 'bg-red-500';
-      default: return 'bg-gray-500';
+    switch (status) {
+      case 'verified': return 'bg-emerald-500/20 text-emerald-400';
+      case 'rejected': return 'bg-red-500/20 text-red-400';
+      case 'pending': return 'bg-yellow-500/20 text-yellow-400';
+      default: return 'bg-gray-500/20 text-gray-400';
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch(status) {
-      case 'verified': return <FiCheckCircle />;
-      case 'rejected': return <FiAlertCircle />;
-      default: return <FiClock />;
-    }
+  const getScoreColor = (score) => {
+    if (!score) return 'text-gray-400';
+    if (score >= 80) return 'text-emerald-400';
+    if (score >= 60) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  const formatTestType = (type) => {
+    if (!type) return 'Unknown';
+    return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  };
+
+  const getImageUrl = (photo, name) => {
+    if (photo && photo.startsWith('http')) return photo;
+    if (photo && photo.startsWith('/')) return `http://localhost:8000${photo}`;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'A')}&background=6366f1&color=fff`;
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg overflow-hidden">
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="font-bold text-lg">{assessment.test_type}</h3>
-            <p className="text-gray-400">Athlete ID: {assessment.user_id}</p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className={`px-2 py-1 rounded text-white text-sm ${getStatusColor(assessment.status)}`}>
-              {getStatusIcon(assessment.status)}
-              <span className="ml-1">{assessment.status}</span>
+    <div className="bg-gray-800/50 backdrop-blur rounded-xl border border-gray-700/50 p-4 hover:border-gray-600/50 transition-all">
+      <div className="flex items-center gap-4">
+        {/* Athlete Photo */}
+        <img
+          src={getImageUrl(assessment.athlete_photo, assessment.athlete_name)}
+          alt={assessment.athlete_name}
+          className="w-12 h-12 rounded-xl object-cover"
+          onError={(e) => {
+            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(assessment.athlete_name || 'A')}&background=6366f1&color=fff`;
+          }}
+        />
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium text-white truncate">{assessment.athlete_name}</h3>
+            <span className={`px-2 py-0.5 rounded-full text-xs ${getStatusColor(assessment.status)}`}>
+              {assessment.status}
             </span>
           </div>
+          <p className="text-sm text-gray-400">{formatTestType(assessment.test_type)}</p>
         </div>
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <FiVideo />
-              <span className="font-bold text-xl">{assessment.ai_score}%</span>
-            </div>
-            <p className="text-gray-400">
-              {new Date(assessment.created_at).toLocaleString()}
-            </p>
-          </div>
-          
-          <button
-            className="text-blue-400 hover:text-blue-300 flex items-center space-x-1"
-            onClick={() => onView(assessment)}
-          >
-            <span>Review</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
+
+        {/* Score */}
+        <div className="text-right">
+          <p className={`text-2xl font-bold ${getScoreColor(assessment.ai_score)}`}>
+            {assessment.ai_score ? `${assessment.ai_score}%` : 'N/A'}
+          </p>
+          <p className="text-xs text-gray-500">
+            {new Date(assessment.created_at).toLocaleDateString()}
+          </p>
         </div>
+
+        {/* Actions */}
+        <button
+          onClick={() => onView(assessment)}
+          className="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30 transition-all"
+        >
+          <FiEye size={18} />
+        </button>
       </div>
+
+      {/* AI Feedback Preview */}
+      {assessment.ai_feedback && (
+        <div className="mt-3 p-3 bg-gray-900/50 rounded-lg">
+          <p className="text-xs text-gray-400 line-clamp-2">{assessment.ai_feedback}</p>
+        </div>
+      )}
     </div>
   );
 };

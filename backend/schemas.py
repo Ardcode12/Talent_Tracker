@@ -215,3 +215,44 @@ class PerformanceDataResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# backend/schemas.py
+# Add these NEW schemas after the existing CommentResponse
+
+# ---------- COMMENT REPLIES ----------
+class ReplyBase(BaseModel):
+    text: str
+
+
+class ReplyCreate(ReplyBase):
+    reply_to_user_id: Optional[int] = None
+
+
+class ReplyResponse(BaseModel):
+    id: int
+    user: PostUser
+    text: str
+    reply_to_user: Optional[PostUser] = None
+    likes_count: int = 0
+    is_liked: bool = False
+    is_own_reply: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CommentWithRepliesResponse(BaseModel):
+    id: int
+    user: PostUser
+    text: str
+    likes_count: int = 0
+    replies_count: int = 0
+    is_liked: bool = False
+    is_own_comment: bool = False
+    created_at: datetime
+    replies: List[ReplyResponse] = []
+    has_more_replies: bool = False
+
+    class Config:
+        from_attributes = True

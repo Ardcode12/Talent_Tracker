@@ -27,11 +27,11 @@ import { getImageUrl, getImageUrlWithFallback, startConversation } from '../serv
 
 import { useNavigation } from '@react-navigation/native';
 
- // ADD THIS LINE
+// ADD THIS LINE
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const API_URL = 'http://10.174.246.35:8000/api'; // Update with your backend URL
+const API_URL = 'http://10.181.133.35:8000/api'; // Update with your backend URL
 
 // Interfaces
 interface Connection {
@@ -75,7 +75,7 @@ interface Group {
 
 export default function ConnectionsScreen() {
   // State
-   const navigation = useNavigation();
+  const navigation = useNavigation();
   const [searchText, setSearchText] = useState('');
   const [selectedTab, setSelectedTab] = useState('discover');
   const [selectedRole, setSelectedRole] = useState('all');
@@ -84,13 +84,13 @@ export default function ConnectionsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Connection | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
-  
+
   // Data states
   const [pendingRequests, setPendingRequests] = useState<ConnectionRequest[]>([]);
   const [myConnections, setMyConnections] = useState<Connection[]>([]);
   const [availableConnections, setAvailableConnections] = useState<Connection[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -114,19 +114,19 @@ export default function ConnectionsScreen() {
       'Content-Type': 'application/json',
       ...options.headers,
     };
-// Add this function after your other handler functions
-const handleMessage = async (user: Connection) => {
-  try {
-    const response = await startConversation(user.id);
-    navigation.navigate('ChatScreen', {
-      conversationId: response.conversation_id,
-      otherUser: user
-    });
-  } catch (error) {
-    console.error('Error starting conversation:', error);
-    Alert.alert('Error', 'Failed to start conversation');
-  }
-};
+    // Add this function after your other handler functions
+    const handleMessage = async (user: Connection) => {
+      try {
+        const response = await startConversation(user.id);
+        navigation.navigate('ChatScreen', {
+          conversationId: response.conversation_id,
+          otherUser: user
+        });
+      } catch (error) {
+        console.error('Error starting conversation:', error);
+        Alert.alert('Error', 'Failed to start conversation');
+      }
+    };
 
     const response = await fetch(url, {
       ...options,
@@ -142,82 +142,82 @@ const handleMessage = async (user: Connection) => {
 
   // Fetch all data
   const fetchData = async (resetPage = true) => {
-  try {
-    if (resetPage) {
-      setLoading(true);
-      setCurrentPage(1);
+    try {
+      if (resetPage) {
+        setLoading(true);
+        setCurrentPage(1);
+      }
+
+      const [connectionsData, requestsData, groupsData] = await Promise.all([
+        fetchWithAuth(`${API_URL}/connections`),
+        fetchWithAuth(`${API_URL}/connections/requests`),
+        fetchWithAuth(`${API_URL}/connections/groups`),
+      ]);
+
+      // Process profile photos for connections WITH FALLBACK NAMES
+      const processedConnections = (connectionsData.data || []).map(conn => ({
+        ...conn,
+        profilePhoto: getImageUrlWithFallback(conn.profilePhoto, conn.name)  // UPDATED
+      }));
+
+      // Process profile photos for requests WITH FALLBACK NAMES
+      const processedRequests = (requestsData.data || []).map(req => ({
+        ...req,
+        profilePhoto: getImageUrlWithFallback(req.profilePhoto, req.name)  // UPDATED
+      }));
+
+      setMyConnections(processedConnections);
+      setPendingRequests(processedRequests);
+      setGroups(groupsData.data || []);
+
+      await fetchAvailableConnections(1, true);
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      Alert.alert('Error', 'Failed to load connections');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-
-    const [connectionsData, requestsData, groupsData] = await Promise.all([
-      fetchWithAuth(`${API_URL}/connections`),
-      fetchWithAuth(`${API_URL}/connections/requests`),
-      fetchWithAuth(`${API_URL}/connections/groups`),
-    ]);
-
-    // Process profile photos for connections WITH FALLBACK NAMES
-    const processedConnections = (connectionsData.data || []).map(conn => ({
-      ...conn,
-      profilePhoto: getImageUrlWithFallback(conn.profilePhoto, conn.name)  // UPDATED
-    }));
-
-    // Process profile photos for requests WITH FALLBACK NAMES
-    const processedRequests = (requestsData.data || []).map(req => ({
-      ...req,
-      profilePhoto: getImageUrlWithFallback(req.profilePhoto, req.name)  // UPDATED
-    }));
-
-    setMyConnections(processedConnections);
-    setPendingRequests(processedRequests);
-    setGroups(groupsData.data || []);
-
-    await fetchAvailableConnections(1, true);
-
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    Alert.alert('Error', 'Failed to load connections');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+  };
 
   // Fetch available connections with filters
   const fetchAvailableConnections = async (page = 1, reset = false) => {
-  try {
-    if (!reset && loadingMore) return;
-    
-    setLoadingMore(true);
-    
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: '20',
-      ...(selectedRole !== 'all' && { role: selectedRole }),
-      ...(searchText && { search: searchText }),
-    });
+    try {
+      if (!reset && loadingMore) return;
 
-    const response = await fetchWithAuth(`${API_URL}/connections/available?${params}`);
-    
-    // Process profile photos WITH FALLBACK NAMES
-    const processedData = (response.data || []).map(user => ({
-      ...user,
-      profilePhoto: getImageUrlWithFallback(user.profilePhoto, user.name)  // UPDATED
-    }));
-    
-    if (reset) {
-      setAvailableConnections(processedData);
-    } else {
-      setAvailableConnections(prev => [...prev, ...processedData]);
+      setLoadingMore(true);
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        ...(selectedRole !== 'all' && { role: selectedRole }),
+        ...(searchText && { search: searchText }),
+      });
+
+      const response = await fetchWithAuth(`${API_URL}/connections/available?${params}`);
+
+      // Process profile photos WITH FALLBACK NAMES
+      const processedData = (response.data || []).map(user => ({
+        ...user,
+        profilePhoto: getImageUrlWithFallback(user.profilePhoto, user.name)  // UPDATED
+      }));
+
+      if (reset) {
+        setAvailableConnections(processedData);
+      } else {
+        setAvailableConnections(prev => [...prev, ...processedData]);
+      }
+
+      setCurrentPage(page);
+      setTotalPages(response.pagination?.pages || 1);
+
+    } catch (error) {
+      console.error('Error fetching available connections:', error);
+    } finally {
+      setLoadingMore(false);
     }
-    
-    setCurrentPage(page);
-    setTotalPages(response.pagination?.pages || 1);
-    
-  } catch (error) {
-    console.error('Error fetching available connections:', error);
-  } finally {
-    setLoadingMore(false);
-  }
-};
+  };
 
   // Send connection request
   const handleConnect = async (connectionId: string) => {
@@ -225,18 +225,18 @@ const handleMessage = async (user: Connection) => {
       await fetchWithAuth(`${API_URL}/connections/request/${connectionId}`, {
         method: 'POST',
       });
-      
+
       Alert.alert('Success', 'Connection request sent!');
-      
+
       // Update the user's pending status in the list
-      setAvailableConnections(prev => 
-        prev.map(conn => 
-          conn.id === connectionId 
+      setAvailableConnections(prev =>
+        prev.map(conn =>
+          conn.id === connectionId
             ? { ...conn, hasPendingRequest: true, requestStatus: 'pending' }
             : conn
         )
       );
-      
+
       // Close modal if open
       setShowUserModal(false);
     } catch (error) {
@@ -251,7 +251,7 @@ const handleMessage = async (user: Connection) => {
       await fetchWithAuth(`${API_URL}/connections/accept/${requestId}`, {
         method: 'POST',
       });
-      
+
       Alert.alert('Success', 'Connection request accepted!');
       await fetchData();
     } catch (error) {
@@ -265,7 +265,7 @@ const handleMessage = async (user: Connection) => {
       await fetchWithAuth(`${API_URL}/connections/reject/${requestId}`, {
         method: 'DELETE',
       });
-      
+
       setPendingRequests(prev => prev.filter(r => r.id !== requestId));
       Alert.alert('Success', 'Request ignored');
     } catch (error) {
@@ -288,7 +288,7 @@ const handleMessage = async (user: Connection) => {
               await fetchWithAuth(`${API_URL}/connections/remove/${connectionId}`, {
                 method: 'DELETE',
               });
-              
+
               setMyConnections(prev => prev.filter(c => c.id !== connectionId));
               Alert.alert('Success', 'Connection removed');
             } catch (error) {
@@ -306,7 +306,7 @@ const handleMessage = async (user: Connection) => {
     const date = new Date(dateString);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
+
     if (seconds < 60) return 'just now';
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -344,14 +344,14 @@ const handleMessage = async (user: Connection) => {
         colors={['rgba(20, 27, 45, 0.95)', 'rgba(20, 27, 45, 0.8)']}
         style={StyleSheet.absoluteFillObject}
       />
-      
+
       <View style={styles.headerContent}>
         <Text style={styles.headerTitle}>Connections</Text>
         <Text style={styles.headerSubtitle}>Build Your Sports Network</Text>
-        
+
         {/* Stats Row */}
         <View style={styles.statsRow}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.statItem}
             onPress={() => setSelectedTab('connections')}
           >
@@ -359,7 +359,7 @@ const handleMessage = async (user: Connection) => {
             <Text style={styles.statLabel}>Connections</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.statItem}
             onPress={() => setSelectedTab('requests')}
           >
@@ -367,7 +367,7 @@ const handleMessage = async (user: Connection) => {
             <Text style={styles.statLabel}>Pending</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.statItem}
             onPress={() => setSelectedTab('discover')}
           >
@@ -376,7 +376,7 @@ const handleMessage = async (user: Connection) => {
           </TouchableOpacity>
         </View>
       </View>
-      
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <BlurView intensity={80} style={styles.searchBlur}>
@@ -390,10 +390,10 @@ const handleMessage = async (user: Connection) => {
           />
         </BlurView>
       </View>
-      
+
       {/* Main Tabs */}
-      <ScrollView 
-        horizontal 
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.mainTabs}
       >
@@ -411,10 +411,10 @@ const handleMessage = async (user: Connection) => {
             ]}
             onPress={() => setSelectedTab(tab.id)}
           >
-            <Ionicons 
-              name={tab.icon as any} 
-              size={20} 
-              color={selectedTab === tab.id ? Theme.colors.text : Theme.colors.textSecondary} 
+            <Ionicons
+              name={tab.icon as any}
+              size={20}
+              color={selectedTab === tab.id ? Theme.colors.text : Theme.colors.textSecondary}
             />
             <Text style={[
               styles.mainTabText,
@@ -428,11 +428,11 @@ const handleMessage = async (user: Connection) => {
           </TouchableOpacity>
         ))}
       </ScrollView>
-      
+
       {/* Role Filter (only for Discover tab) */}
       {selectedTab === 'discover' && (
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.roleFilter}
         >
@@ -469,13 +469,12 @@ const handleMessage = async (user: Connection) => {
         <View style={styles.discoverCardContent}>
           <View style={styles.discoverCardHeader}>
             <View style={styles.profileSection}>
-              <Image 
-  source={{ uri: item.profilePhoto || 'https://via.placeholder.com/80' }} 
-  style={styles.discoverPhoto}
-  onError={(e) => {
-    console.log('Image load error:', e.nativeEvent.error);
-  }}
-/>
+              <Image
+                source={{
+                  uri: getImageUrlWithFallback(item.profilePhoto, item.name)
+                }}
+                style={styles.discoverPhoto}
+              />
 
               {item.isOnline && <View style={styles.onlineIndicator} />}
               {item.verified && (
@@ -484,14 +483,14 @@ const handleMessage = async (user: Connection) => {
                 </View>
               )}
             </View>
-            
+
             <View style={styles.discoverInfo}>
               <Text style={styles.discoverName}>{item.name}</Text>
               <View style={styles.roleTag}>
                 <Text style={styles.roleTagText}>{item.role}</Text>
               </View>
               <Text style={styles.discoverSport}>{item.sport}</Text>
-              
+
               <View style={styles.discoverMeta}>
                 <View style={styles.metaItem}>
                   <Ionicons name="location" size={12} color={Theme.colors.textSecondary} />
@@ -506,13 +505,13 @@ const handleMessage = async (user: Connection) => {
               </View>
             </View>
           </View>
-          
+
           {item.bio && (
             <Text style={styles.discoverBio} numberOfLines={2}>
               {item.bio}
             </Text>
           )}
-          
+
           <View style={styles.discoverStats}>
             {item.connections !== undefined && (
               <View style={styles.statBox}>
@@ -533,7 +532,7 @@ const handleMessage = async (user: Connection) => {
               </View>
             )}
           </View>
-          
+
           <TouchableOpacity
             style={[
               styles.connectButton,
@@ -620,15 +619,15 @@ const handleMessage = async (user: Connection) => {
       <ScrollView style={styles.scrollContent}>
         {pendingRequests.map(request => (
           <View key={request.id} style={styles.requestFullCard}>
-            <Image 
-              source={{ uri: request.profilePhoto || 'https://via.placeholder.com/60' }} 
-              style={styles.requestFullPhoto} 
+            <Image
+              source={{ uri: request.profilePhoto || 'https://via.placeholder.com/60' }}
+              style={styles.requestFullPhoto}
             />
-            
+
             <View style={styles.requestFullInfo}>
               <Text style={styles.requestFullName}>{request.name}</Text>
               <Text style={styles.requestFullRole}>{request.role} • {request.sport}</Text>
-              
+
               {request.mutualConnections > 0 && (
                 <View style={styles.mutualContainer}>
                   <Ionicons name="people" size={14} color={Theme.colors.primary} />
@@ -637,19 +636,19 @@ const handleMessage = async (user: Connection) => {
                   </Text>
                 </View>
               )}
-              
+
               <Text style={styles.requestTime}>{getTimeAgo(request.requestTime)}</Text>
             </View>
-            
+
             <View style={styles.requestFullActions}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.acceptButton}
                 onPress={() => handleAcceptRequest(request.id)}
               >
                 <Ionicons name="checkmark" size={18} color="#fff" />
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.rejectButton}
                 onPress={() => handleIgnoreRequest(request.id)}
               >
@@ -664,8 +663,8 @@ const handleMessage = async (user: Connection) => {
 
   // Render My Connections Tab
   const renderConnectionsTab = () => {
-    const filteredConnections = myConnections.filter(c => 
-      !searchText || 
+    const filteredConnections = myConnections.filter(c =>
+      !searchText ||
       c.name.toLowerCase().includes(searchText.toLowerCase()) ||
       c.sport?.toLowerCase().includes(searchText.toLowerCase()) ||
       c.location?.toLowerCase().includes(searchText.toLowerCase())
@@ -679,13 +678,13 @@ const handleMessage = async (user: Connection) => {
             {searchText ? 'No connections found' : 'No connections yet'}
           </Text>
           <Text style={styles.emptyStateText}>
-            {searchText 
+            {searchText
               ? `No connections matching "${searchText}"`
               : 'Start building your network by connecting with athletes and coaches'
             }
           </Text>
           {!searchText && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.discoverButton}
               onPress={() => setSelectedTab('discover')}
             >
@@ -699,8 +698,8 @@ const handleMessage = async (user: Connection) => {
     return (
       <ScrollView style={styles.scrollContent}>
         {filteredConnections.map(connection => (
-          <TouchableOpacity 
-            key={connection.id} 
+          <TouchableOpacity
+            key={connection.id}
             style={styles.connectionFullCard}
             onPress={() => {
               setSelectedUser(connection);
@@ -709,15 +708,15 @@ const handleMessage = async (user: Connection) => {
           >
             <View style={styles.connectionFullContent}>
               <View style={styles.connectionFullLeft}>
-                <Image 
-                  source={{ uri: connection.profilePhoto || 'https://via.placeholder.com/60' }} 
-                  style={styles.connectionFullPhoto} 
+                <Image
+                  source={{ uri: connection.profilePhoto || 'https://via.placeholder.com/60' }}
+                  style={styles.connectionFullPhoto}
                 />
                 <View style={[styles.statusIndicator, {
                   backgroundColor: connection.isOnline ? Theme.colors.success : Theme.colors.textSecondary,
                 }]} />
               </View>
-              
+
               <View style={styles.connectionFullInfo}>
                 <Text style={styles.connectionFullName}>{connection.name}</Text>
                 <Text style={styles.connectionFullRole}>
@@ -727,16 +726,16 @@ const handleMessage = async (user: Connection) => {
                   {connection.isOnline ? 'Active now' : connection.lastActive ? getTimeAgo(connection.lastActive) : 'Offline'}
                 </Text>
               </View>
-              
-              <View style={styles.connectionFullActions}>
-                <TouchableOpacity 
-  style={styles.messageButton}
-  onPress={() => handleMessage(connection)}
->
-  <Ionicons name="chatbubble" size={20} color={Theme.colors.primary} />
-</TouchableOpacity>
 
-                <TouchableOpacity 
+              <View style={styles.connectionFullActions}>
+                <TouchableOpacity
+                  style={styles.messageButton}
+                  onPress={() => handleMessage(connection)}
+                >
+                  <Ionicons name="chatbubble" size={20} color={Theme.colors.primary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   style={styles.moreButton}
                   onPress={() => handleRemoveConnection(connection.id)}
                 >
@@ -769,21 +768,21 @@ const handleMessage = async (user: Connection) => {
         <View style={styles.groupsGrid}>
           {groups.map(group => (
             <TouchableOpacity key={group.id} style={styles.groupFullCard}>
-              <Image 
-                source={{ uri: group.logo || 'https://via.placeholder.com/100' }} 
-                style={styles.groupFullLogo} 
+              <Image
+                source={{ uri: group.logo || 'https://via.placeholder.com/100' }}
+                style={styles.groupFullLogo}
               />
               <Text style={styles.groupFullName}>{group.name}</Text>
               <Text style={styles.groupFullType}>{group.type}</Text>
               <Text style={styles.groupFullDescription} numberOfLines={2}>
                 {group.description}
               </Text>
-              
+
               <View style={styles.groupFullStats}>
                 <Ionicons name="people" size={16} color={Theme.colors.textSecondary} />
                 <Text style={styles.groupFullMembers}>{group.memberCount} members</Text>
               </View>
-              
+
               <TouchableOpacity style={styles.joinGroupButton}>
                 <Text style={styles.joinGroupText}>Request to Join</Text>
               </TouchableOpacity>
@@ -806,12 +805,12 @@ const handleMessage = async (user: Connection) => {
         onRequestClose={() => setShowUserModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalBackground}
             activeOpacity={1}
             onPress={() => setShowUserModal(false)}
           />
-          
+
           <View style={styles.modalContent}>
             <ScrollView>
               {/* Modal Header */}
@@ -822,21 +821,21 @@ const handleMessage = async (user: Connection) => {
                 >
                   <Ionicons name="close" size={24} color={Theme.colors.text} />
                 </TouchableOpacity>
-                
-                <Image 
+
+                <Image
                   source={{ uri: selectedUser.profilePhoto || 'https://via.placeholder.com/120' }}
                   style={styles.modalProfilePhoto}
                 />
-                
+
                 {selectedUser.verified && (
                   <View style={styles.modalVerifiedBadge}>
                     <Ionicons name="checkmark-circle" size={24} color={Theme.colors.primary} />
                   </View>
                 )}
-                
+
                 <Text style={styles.modalName}>{selectedUser.name}</Text>
                 <Text style={styles.modalRole}>{selectedUser.role} • {selectedUser.sport}</Text>
-                
+
                 {selectedUser.isOnline && (
                   <View style={styles.modalOnlineStatus}>
                     <View style={styles.modalOnlineDot} />
@@ -844,7 +843,7 @@ const handleMessage = async (user: Connection) => {
                   </View>
                 )}
               </View>
-              
+
               {/* Modal Body */}
               <View style={styles.modalBody}>
                 {/* Bio */}
@@ -854,7 +853,7 @@ const handleMessage = async (user: Connection) => {
                     <Text style={styles.modalBio}>{selectedUser.bio}</Text>
                   </View>
                 )}
-                
+
                 {/* Details */}
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Details</Text>
@@ -879,7 +878,7 @@ const handleMessage = async (user: Connection) => {
                     )}
                   </View>
                 </View>
-                
+
                 {/* Achievements */}
                 {selectedUser.achievements && (
                   <View style={styles.modalSection}>
@@ -887,7 +886,7 @@ const handleMessage = async (user: Connection) => {
                     <Text style={styles.modalAchievements}>{selectedUser.achievements}</Text>
                   </View>
                 )}
-                
+
                 {/* Stats */}
                 <View style={styles.modalStats}>
                   {selectedUser.connections !== undefined && (
@@ -905,7 +904,7 @@ const handleMessage = async (user: Connection) => {
                     </View>
                   )}
                 </View>
-                
+
                 {/* Action Button */}
                 {!myConnections.find(c => c.id === selectedUser.id) && (
                   <TouchableOpacity
@@ -956,7 +955,7 @@ const handleMessage = async (user: Connection) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       {renderHeader()}
       {renderContent()}
       {renderUserModal()}

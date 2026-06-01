@@ -1,7 +1,7 @@
 # backend/main.py
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -21,47 +21,47 @@ from core.config import UPLOAD_DIR
 # Import API routers
 from api import auth, users, assessments, connections, posts, coaches, messaging, admin, message_ws
 from api import notifications, search, rankings 
+from api import events
 
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
-# Database initialization (commented out drop_all)
-# print("Attempting database schema creation/update...")
-# try:
-#     # Ensure models.Base.metadata.drop_all is COMMENTED OUT or REMOVED
-#     # The database has been manually wiped. Now just create.
-#     # models.Base.metadata.drop_all(bind=engine) # <--- THIS LINE MUST BE COMMENTED OUT or REMOVED
-#     models.Base.metadata.create_all(bind=engine) # <--- THIS LINE MUST BE UNCOMMENTED
-#     print("Database tables created/updated successfully.")
-# except Exception as e:
-#     print(f"Database initialization error: {e}")
-#     print(traceback.format_exc()) # Print full traceback to console
-#     raise e # Re-raise the exception to clearly show it in Uvicorn logs
+# Create database tables
+print("Initializing database tables...")
+models.Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app
 app = FastAPI(title="TalentTracker API", version="1.0.0")
 
-# CORS Middleware Configuration
+# ============================================================================
+# CORS MIDDLEWARE - ALLOW ALL FOR DEVELOPMENT
+# ============================================================================
+# This MUST be added BEFORE any routes
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8081",
-        "http://localhost:19006",
-        "http://localhost:3000",
-        "http://127.0.0.1:8081",
-        "*"  # Allow all origins during development
-    ],
+    allow_origins=["*"],  # Allow ALL origins for development
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"]
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],
 )
 
-# Mount static files for uploads
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+# ============================================================================
+# STATIC FILES
+# ============================================================================
 
-# Include API routers
+# Mount static files for uploads
+try:
+    app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+except Exception as e:
+    print(f"Warning: Could not mount uploads directory: {e}")
+
+# ============================================================================
+# INCLUDE API ROUTERS
+# ============================================================================
+
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(assessments.router)
@@ -71,24 +71,31 @@ app.include_router(coaches.router)
 app.include_router(messaging.router)
 app.include_router(admin.router)
 app.include_router(message_ws.router)
-app.include_router(notifications.router)  # ADD
-app.include_router(search.router)         # ADD
-app.include_router(rankings.router)       # ADD
+app.include_router(notifications.router)
+app.include_router(search.router)
+app.include_router(rankings.router)
+app.include_router(events.router)
 
-# ===========================
-# General / Root Endpoints
-# ===========================
+# ============================================================================
+# ROOT ENDPOINTS
+# ============================================================================
 
 @app.get("/")
 def root():
     return {
         "message": "Welcome to TalentTracker API",
+        "version": "1.0.0",
+        "status": "running",
+        "cors": "enabled for all origins",
         "endpoints": {
             "api_docs": "/docs",
-            "admin_dashboard": "/api/admin/dashboard",
-            "health_check": "/api/health"
+            "health_check": "/api/health",
+            "admin_athletes": "/api/admin/athletes",
+            "admin_coaches": "/api/admin/coaches",
+            "admin_dashboard": "/api/admin/dashboard/stats"
         }
     }
+
 
 @app.get("/api/health")
 def health_check(db: Session = Depends(get_db)):
@@ -102,13 +109,41 @@ def health_check(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
 
-# The /admin/dashboard HTML endpoint (from your old main.py)
-# Keep this if you want a separate HTML route, otherwise remove it and rely on /api/admin/dashboard
+
+# ============================================================================
+# ADMIN DASHBOARD HTML (Legacy endpoint)
+# ============================================================================
+
+@app.get("/api/test-assessment-flow")
+def test_assessment_flow():
+    """Test the exact feedback format that would be saved"""
+    
+    EMOJI = {
+        'check': '\u2705',
+        'medal': '\U0001F3C5',
+        'bullet': '\u2022',
+    }
+    
+    # This is exactly what assessments.py creates
+    feedback = (
+        f"{EMOJI['check']} Squat Analysis:\n\n"
+        f"{EMOJI['bullet']} Valid Reps: 10\n"
+        f"{EMOJI['bullet']} Partial Reps: 2\n"
+        f"{EMOJI['bullet']} Consistency: 85.5%\n\n"
+        f"{EMOJI['medal']} AI Score: 78%"
+    )
+    
+    return {
+        "feedback": feedback,
+        "feedback_bytes": feedback.encode('utf-8').hex(),
+        "length": len(feedback)
+    }
+
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 def old_admin_dashboard(db: Session = Depends(get_db)):
     users = db.query(models.User).all()
     athletes = sum(1 for user in users if user.role == 'athlete')
-    coaches = sum(1 for user in users if user.role == 'coach')
+    coaches_count = sum(1 for user in users if user.role == 'coach')
     
     html_content = f"""
     <!DOCTYPE html>
@@ -119,14 +154,15 @@ def old_admin_dashboard(db: Session = Depends(get_db)):
                 body {{ 
                     font-family: Arial, sans-serif; 
                     margin: 20px; 
-                    background-color: #f5f5f5; 
+                    background-color: #1a1a2e; 
+                    color: white;
                 }}
                 .container {{
                     max-width: 1200px;
                     margin: 0 auto;
                 }}
                 h1 {{ 
-                    color: #333; 
+                    color: #fff; 
                     text-align: center;
                     margin-bottom: 10px;
                 }}
@@ -137,66 +173,32 @@ def old_admin_dashboard(db: Session = Depends(get_db)):
                     margin-bottom: 20px;
                 }}
                 .stat-card {{
-                    background: white;
+                    background: #16213e;
                     padding: 20px;
                     border-radius: 10px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                     text-align: center;
+                    border: 1px solid #0f3460;
                 }}
                 .stat-number {{
                     font-size: 32px;
                     font-weight: bold;
-                    color: #4CAF50;
+                    color: #667eea;
                 }}
-                table {{ 
-                    border-collapse: collapse; 
-                    width: 100%; 
-                    background-color: white; 
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                .info {{
+                    text-align: center;
+                    margin-top: 20px;
+                    padding: 20px;
+                    background: #16213e;
                     border-radius: 10px;
-                    overflow: hidden;
                 }}
-                th, td {{ 
-                    border: 1px solid #ddd; 
-                    padding: 12px; 
-                    text-align: left; 
-                }}
-                th {{ 
-                    background-color: #4CAF50; 
-                    color: white; 
-                    font-weight: bold;
-                }}
-                tr:nth-child(even) {{ 
-                    background-color: #f2f2f2; 
-                }}
-                tr:hover {{
-                    background-color: #e8f5e9;
-                }}
-                .athlete {{ 
-                    color: #2196F3; 
-                    font-weight: bold; 
-                }}
-                .coach {{ 
-                    color: #FF9800; 
-                    font-weight: bold; 
-                }}
-                .empty {{
-                    color: #999;
-                }}
-                .profile-img {{
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 50%;
-                    object-fit: cover;
-                }}
-                .verified {{
-                    color: #4CAF50;
+                a {{
+                    color: #667eea;
                 }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>ðŸ† TalentTracker Admin Dashboard</h1> 
+                <h1>🏆 TalentTracker Admin Dashboard</h1>
                 
                 <div class="stats">
                     <div class="stat-card">
@@ -204,67 +206,19 @@ def old_admin_dashboard(db: Session = Depends(get_db)):
                         <div>Total Users</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" style="color: #2196F3;">{athletes}</div>
+                        <div class="stat-number" style="color: #3b82f6;">{athletes}</div>
                         <div>Athletes</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" style="color: #FF9800;">{coaches}</div>
+                        <div class="stat-number" style="color: #22c55e;">{coaches_count}</div>
                         <div>Coaches</div>
                     </div>
                 </div>
                 
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Profile</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Sport/Specialization</th>
-                        <th>Age</th>
-                        <th>Location</th>
-                        <th>Phone</th>
-                        <th>Experience</th>
-                        <th>AI Score</th>
-                        <th>Verified</th>
-                    </tr>
-    """
-    
-    for user in users:
-        role_class = 'athlete' if user.role == 'athlete' else 'coach'
-        sport_info = user.sport or user.specialization or '<span class="empty">Not specified</span>'
-        experience_info = f"{user.experience} years" if user.experience else '<span class="empty">-</span>'
-        phone_info = user.phone or '<span class="empty">Not provided</span>'
-        age_info = f"{user.age} years" if user.age else '<span class="empty">-</span>'
-        location_info = user.location or '<span class="empty">Not specified</span>'
-        ai_score = getattr(user, 'ai_score', None)
-        ai_score_info = f"{ai_score}%" if ai_score else '<span class="empty">-</span>'
-        is_verified = getattr(user, 'is_verified', False)
-        verified_info = '<span class="verified">âœ“</span>' if is_verified else '<span class="empty">âœ—</span>'
-        
-        profile_img_html = '<span class="empty">No photo</span>'
-        if user.profile_image:
-            profile_img_html = f'<img src="{user.profile_image}" class="profile-img" alt="Profile" onerror="this.style.display=\'none\'">'
-        
-        html_content += f"""
-                    <tr>
-                        <td>{user.id}</td>
-                        <td>{profile_img_html}</td>
-                        <td>{user.name}</td>
-                        <td>{user.email}</td>
-                        <td class="{role_class}">{user.role.upper() if user.role else 'USER'}</td>
-                        <td>{sport_info}</td>
-                        <td>{age_info}</td>
-                        <td>{location_info}</td>
-                        <td>{phone_info}</td>
-                        <td>{experience_info}</td>
-                        <td>{ai_score_info}</td>
-                        <td>{verified_info}</td>
-                    </tr>
-        """
-    
-    html_content += """
-                </table>
+                <div class="info">
+                    <p>Use the React Admin Dashboard at <a href="http://localhost:3000">http://localhost:3000</a></p>
+                    <p><a href="/docs">API Documentation</a> | <a href="/api/health">Health Check</a></p>
+                </div>
             </div>
         </body>
     </html>
@@ -273,7 +227,17 @@ def old_admin_dashboard(db: Session = Depends(get_db)):
     return html_content
 
 
-# Run the application
+# ============================================================================
+# RUN APPLICATION
+# ============================================================================
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("=" * 50)
+    print("Starting TalentTracker API...")
+    print("=" * 50)
+    print("API Docs: http://localhost:8000/docs")
+    print("Health:   http://localhost:8000/api/health")
+    print("Athletes: http://localhost:8000/api/admin/athletes")
+    print("=" * 50)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

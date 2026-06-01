@@ -19,15 +19,32 @@ from ml_models.vertical_jump_analyzer import VerticalJumpAnalyzer
 
 router = APIRouter(prefix="/api/assessments", tags=["assessments"])
 
+# ============================================================================
+# EMOJI CONSTANTS (Unicode escape sequences - encoding safe)
+# ============================================================================
+EMOJI = {
+    'check': '\u2705',           # ✅
+    'medal': '\U0001F3C5',       # 🏅
+    'no_entry': '\U0001F6AB',    # 🚫
+    'ruler': '\U0001F4CF',       # 📏
+    'check_mark': '\u2714\uFE0F', # ✔️
+    'runner': '\U0001F3C3',      # 🏃
+    'fire': '\U0001F525',        # 🔥
+    'trophy': '\U0001F3C6',      # 🏆
+    'muscle': '\U0001F4AA',      # 💪
+    'star': '\u2B50',            # ⭐
+    'bullet': '\u2022',          # •
+    'brain': '\U0001F9E0',       # 🧠
+    'target': '\U0001F3AF',      # 🎯
+}
+
 
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
 def calculate_average_of_best_scores(user_id: int, db: Session) -> Optional[float]:
-    """
-    Calculate AI score as average of BEST scores per assessment type.
-    """
+    """Calculate AI score as average of BEST scores per assessment type."""
     best_scores_query = db.query(
         models.Assessment.test_type,
         func.max(models.Assessment.ai_score).label('best_score')
@@ -49,9 +66,7 @@ def calculate_average_of_best_scores(user_id: int, db: Session) -> Optional[floa
 
 
 def calculate_average_of_all_scores(user_id: int, db: Session) -> Optional[float]:
-    """
-    Calculate average of ALL assessment scores.
-    """
+    """Calculate average of ALL assessment scores."""
     result = db.query(
         func.avg(models.Assessment.ai_score).label('avg_score')
     ).filter(
@@ -66,9 +81,7 @@ def calculate_average_of_all_scores(user_id: int, db: Session) -> Optional[float
 
 
 def update_user_national_rank(user_id: int, ai_score: float, db: Session) -> Optional[int]:
-    """
-    Calculate and update user's national rank based on their AI score.
-    """
+    """Calculate and update user's national rank based on their AI score."""
     if not ai_score or ai_score <= 0:
         return None
     
@@ -91,20 +104,14 @@ def update_user_national_rank(user_id: int, ai_score: float, db: Session) -> Opt
 
 
 def recalculate_user_scores(user_id: int, db: Session) -> tuple:
-    """
-    Recalculate user's AI score (best average) and national rank.
-    Returns: (new_ai_score, new_rank)
-    """
-    # Calculate average of best scores per type
+    """Recalculate user's AI score (best average) and national rank."""
     new_ai_score = calculate_average_of_best_scores(user_id, db)
     
-    # Update user's AI score
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user:
         user.ai_score = new_ai_score
         db.commit()
     
-    # Calculate and update rank
     new_rank = update_user_national_rank(user_id, new_ai_score, db) if new_ai_score else None
     
     return new_ai_score, new_rank
@@ -162,13 +169,15 @@ async def upload_assessment(
                 base = 50
                 ai_score = base + min(40, valid * 2.5) + (result.get("consistency_score", 0) / 100) * 10
             ai_score = max(0, min(100, ai_score))
+            
+            # Using EMOJI constants for encoding safety
             feedback = (
-                f"✅ Squat Analysis:\n\n"
-                f"• Valid Reps: {valid}\n"
-                f"• Partial Reps: {partial}\n"
-                f"• Consistency: {result.get('consistency_score', 0):.1f}%\n"
-                f"• Avg Rep Time: {result.get('average_rep_time', 0):.2f}s\n\n"
-                f"🏅 AI Score: {ai_score:.0f}%"
+                f"{EMOJI['check']} Squat Analysis:\n\n"
+                f"{EMOJI['bullet']} Valid Reps: {valid}\n"
+                f"{EMOJI['bullet']} Partial Reps: {partial}\n"
+                f"{EMOJI['bullet']} Consistency: {result.get('consistency_score', 0):.1f}%\n"
+                f"{EMOJI['bullet']} Avg Rep Time: {result.get('average_rep_time', 0):.2f}s\n\n"
+                f"{EMOJI['medal']} AI Score: {ai_score:.0f}%"
             )
             analysis_result = result
 
@@ -177,10 +186,12 @@ async def upload_assessment(
             result = shuttle.analyze_video(str(file_path))
             if result.get("success"):
                 ai_score = result["ai_score"]
-                feedback = result["feedback"]
+                # The analyzer might return feedback with emojis, wrap it
+                raw_feedback = result.get("feedback", "")
+                feedback = raw_feedback  # Analyzer should use EMOJI constants too
                 analysis_result = result
             else:
-                feedback = f"🚫 Shuttle-run analysis failed: {result.get('error')}"
+                feedback = f"{EMOJI['no_entry']} Shuttle-run analysis failed: {result.get('error')}"
                 ai_score = 0
 
         elif test_type == "vertical_jump":
@@ -188,20 +199,20 @@ async def upload_assessment(
             result = vja.analyze_video(str(file_path))
             if result.get("success"):
                 ai_score = result["ai_score"]
-                feedback = result["feedback"]
+                feedback = result.get("feedback", "")
                 analysis_result = result
             else:
-                feedback = f"🚫 Vertical-jump analysis failed: {result.get('error')}"
+                feedback = f"{EMOJI['no_entry']} Vertical-jump analysis failed: {result.get('error')}"
                 ai_score = 0
 
         elif test_type == "height_detection":
             detected = 160 + random.random() * 40
             ai_score = 95 + random.random() * 5
             feedback = (
-                f"📏 Height Detection:\n\n"
-                f"• Estimated height: {detected:.1f} cm\n"
-                f"• Confidence: {ai_score:.1f}%\n\n"
-                f"✔️ Recorded successfully!"
+                f"{EMOJI['ruler']} Height Detection:\n\n"
+                f"{EMOJI['bullet']} Estimated height: {detected:.1f} cm\n"
+                f"{EMOJI['bullet']} Confidence: {ai_score:.1f}%\n\n"
+                f"{EMOJI['check_mark']} Recorded successfully!"
             )
 
         # Save assessment to database
@@ -218,9 +229,7 @@ async def upload_assessment(
         db.commit()
         db.refresh(assessment)
 
-        # ================================================================
-        # RECALCULATE USER'S AI SCORE AS AVERAGE OF BEST SCORES PER TYPE
-        # ================================================================
+        # Recalculate user's AI score
         new_ai_score, new_rank = recalculate_user_scores(current_user.id, db)
 
         # Get total athletes for context
@@ -239,13 +248,13 @@ async def upload_assessment(
         return {
             "id": assessment.id,
             "test_type": test_type,
-            "ai_score": float(ai_score),  # This assessment's score
+            "ai_score": float(ai_score),
             "feedback": feedback,
             "details": analysis_result,
             "status": "completed",
             "user_stats": {
-                "ai_score": new_ai_score,  # Average of BEST scores (for Home page)
-                "this_assessment_score": float(ai_score),  # This specific assessment
+                "ai_score": new_ai_score,
+                "this_assessment_score": float(ai_score),
                 "national_rank": new_rank,
                 "total_athletes": total_athletes,
                 "percentile": percentile
@@ -262,7 +271,6 @@ async def upload_assessment(
             except Exception:
                 pass
         raise HTTPException(status_code=500, detail="Assessment processing failed")
-
 
 @router.get("")
 async def get_assessments(

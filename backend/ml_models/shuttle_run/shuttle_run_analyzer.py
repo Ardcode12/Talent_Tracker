@@ -12,9 +12,15 @@ import mediapipe as mp
 from .assessment.agility_analyzer import analyze_agility
 from .shuttle_run_model_utils import predict, get_feature_names
 
-# Initialize MediaPipe
-mp_pose = mp.solutions.pose
-mp_drawing = mp.solutions.drawing_utils
+# Initialize MediaPipe safely
+try:
+    import mediapipe as mp
+    mp_pose = mp.solutions.pose
+    mp_drawing = mp.solutions.drawing_utils
+except AttributeError:
+    print("WARNING: mediapipe built without solutions module, CV features disabled.")
+    mp_pose = None
+    mp_drawing = None
 
 class ShuttleRunAnalyzer:
     """
@@ -77,13 +83,19 @@ class ShuttleRunAnalyzer:
         score = model_out["numeric_score"]
         total_time = agi.get("total_time", 0.0)
 
+    # Use Unicode escape sequences for emojis
+        runner = '\U0001F3C3'  # 🏃
+        bullet = '\u2022'       # •
+        medal = '\U0001F3C5'    # 🏅
+        fire = '\U0001F525'     # 🔥
+
         return (
-            f"ðŸƒâ€â™‚ï¸ Shuttle-Run Analysis\n"
-            f"â€¢ Band: {band}\n"
-            f"â€¢ AI Score: {score:.1f}%\n"
-            f"â€¢ Total Time: {total_time:.2f} s\n"
-            f"\nKeep training to move to the next band!"
-        )
+            f"{runner} Shuttle-Run Analysis\n\n"
+            f"{bullet} Band: {band}\n"
+            f"{bullet} AI Score: {score:.1f}%\n"
+            f"{bullet} Total Time: {total_time:.2f} s\n\n"
+        f"{medal} Keep training to move to the next band!"
+    )
 
     def _detect_cheating(self, video_path: str, feature_vec: List[float]) -> Dict[str, Any]:
         """Detect potential cheating patterns in the video"""
