@@ -7,10 +7,7 @@ from typing import Dict, Any
 
 class VerticalJumpAnalyzer:
     def analyze_video(self, video_path: str) -> Dict[str, Any]:
-        """
-        Analyze vertical jump video using a pure Python approach with MediaPipe.
-        This is the primary analysis method.
-        """
+
         print("INFO: Starting Python-based vertical jump analysis.")
         return self._python_fallback_analysis(video_path)
 
