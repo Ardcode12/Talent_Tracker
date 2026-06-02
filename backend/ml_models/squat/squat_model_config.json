@@ -1,0 +1,32 @@
+{
+  "model_type": "squat_form_classifier",
+  "version": "2.0",
+  "input_features": 12,
+  "feature_names": [
+    "left_knee_angle",
+    "right_knee_angle",
+    "left_hip_angle",
+    "right_hip_angle",
+    "left_ankle_angle",
+    "right_ankle_angle",
+    "spine_angle",
+    "torso_lean",
+    "left_knee_lateral",
+    "right_knee_lateral",
+    "symmetry_score",
+    "hip_depth"
+  ],
+  "num_classes": 6,
+  "label_map": {
+    "0": "Correct",
+    "1": "Shallow Squat",
+    "2": "Forward Lean",
+    "3": "Knees Caving In",
+    "4": "Heels Off Ground",
+    "5": "Asymmetric Squat"
+  },
+  "outputs": {
+    "form_class": "6-class softmax (squat form type)",
+    "quality_score": "sigmoid 0-1 (multiply by 100 for percentage)"
+  }
+}

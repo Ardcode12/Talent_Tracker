@@ -13,7 +13,7 @@ from pathlib import Path
 import random, shutil, traceback
 
 # Analyzers
-from ml_models.squat_counter_enhanced import EnhancedSquatCounter
+from ml_models.squat.squat_analyzer import SquatAnalyzer
 from ml_models.shuttle_run.shuttle_run_analyzer import ShuttleRunAnalyzer
 from ml_models.vertical_jump_analyzer import VerticalJumpAnalyzer
 
@@ -160,26 +160,16 @@ async def upload_assessment(
         ai_score, feedback, analysis_result = 0, "Analysis pending.", {}
 
         if test_type == "squats":
-            counter = EnhancedSquatCounter()
-            result = counter.analyze_video(str(file_path))
-            valid, partial = result.get("count", 0), result.get("partial_squats", 0)
-            if valid == 0:
-                ai_score = 15 * (partial / (partial + 1))
+            analyzer = SquatAnalyzer()
+            result = analyzer.analyze_video(str(file_path))
+            if result.get("success"):
+                ai_score = result["ai_score"]
+                feedback = result.get("feedback", "")
+                analysis_result = result
             else:
-                base = 50
-                ai_score = base + min(40, valid * 2.5) + (result.get("consistency_score", 0) / 100) * 10
-            ai_score = max(0, min(100, ai_score))
-            
-            # Using EMOJI constants for encoding safety
-            feedback = (
-                f"{EMOJI['check']} Squat Analysis:\n\n"
-                f"{EMOJI['bullet']} Valid Reps: {valid}\n"
-                f"{EMOJI['bullet']} Partial Reps: {partial}\n"
-                f"{EMOJI['bullet']} Consistency: {result.get('consistency_score', 0):.1f}%\n"
-                f"{EMOJI['bullet']} Avg Rep Time: {result.get('average_rep_time', 0):.2f}s\n\n"
-                f"{EMOJI['medal']} AI Score: {ai_score:.0f}%"
-            )
-            analysis_result = result
+                feedback = f"{EMOJI['no_entry']} Squat analysis failed: {result.get('error', 'Unknown error')}"
+                ai_score = 0
+                analysis_result = result
 
         elif test_type == "shuttle_run":
             shuttle = ShuttleRunAnalyzer()

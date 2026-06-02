@@ -1,0 +1,499 @@
+# backend/ml_models/squat/squat_analyzer.py
+"""
+Squat Form Analyzer using trained Keras model.
+Extracts 12 biomechanical features per frame via MediaPipe,
+runs them through the trained classifier to detect form errors,
+counts reps, and generates scores + feedback.
+"""
+
+import cv2
+import json
+import numpy as np
+import traceback
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+
+import mediapipe as mp
+
+# Load model lazily to avoid import-time errors
+_model = None
+_scaler = None
+_config = None
+
+MODEL_DIR = Path(__file__).parent
+
+LABEL_MAP = {
+    0: "Correct",
+    1: "Shallow Squat",
+    2: "Forward Lean",
+    3: "Knees Caving In",
+    4: "Heels Off Ground",
+    5: "Asymmetric Squat"
+}
+
+
+def _load_model():
+    """Lazy-load the trained model, scaler, and config."""
+    global _model, _scaler, _config
+
+    if _model is not None:
+        return
+
+    import tensorflow as tf
+    import joblib
+
+    keras_path = MODEL_DIR / "squat_classifier.keras"
+    scaler_path = MODEL_DIR / "squat_scaler.pkl"
+    config_path = MODEL_DIR / "squat_model_config.json"
+
+    if not keras_path.exists():
+        raise FileNotFoundError(f"Squat model not found at {keras_path}")
+
+    print(f"INFO: Loading squat classifier from {keras_path}")
+    _model = tf.keras.models.load_model(str(keras_path))
+
+    if scaler_path.exists():
+        _scaler = joblib.load(str(scaler_path))
+        print(f"INFO: Loaded squat scaler from {scaler_path}")
+    else:
+        print("WARNING: Squat scaler not found, using raw features")
+        _scaler = None
+
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            _config = json.load(f)
+        print(f"INFO: Loaded squat config: {_config.get('input_features')} features")
+    else:
+        _config = {"input_features": 12}
+
+
+def _calc_angle(a, b, c):
+    """Calculate angle at point b between points a-b-c. Each is [x, y]."""
+    ba = np.array(a) - np.array(b)
+    bc = np.array(c) - np.array(b)
+    cos_val = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-8)
+    return float(np.degrees(np.arccos(np.clip(cos_val, -1.0, 1.0))))
+
+
+def _extract_frame_features(landmarks) -> Optional[List[float]]:
+    """
+    Extract the 12 features matching the trained model from MediaPipe landmarks.
+    
+    Features (from squat_model_config.json):
+      0: left_knee_angle
+      1: right_knee_angle
+      2: left_hip_angle
+      3: right_hip_angle
+      4: left_ankle_angle
+      5: right_ankle_angle
+      6: spine_angle
+      7: torso_lean
+      8: left_knee_lateral
+      9: right_knee_lateral
+      10: symmetry_score
+      11: hip_depth
+    """
+    try:
+        lm = landmarks
+
+        # Joint positions as [x, y]
+        l_shoulder = [lm[11].x, lm[11].y]
+        r_shoulder = [lm[12].x, lm[12].y]
+        l_hip = [lm[23].x, lm[23].y]
+        r_hip = [lm[24].x, lm[24].y]
+        l_knee = [lm[25].x, lm[25].y]
+        r_knee = [lm[26].x, lm[26].y]
+        l_ankle = [lm[27].x, lm[27].y]
+        r_ankle = [lm[28].x, lm[28].y]
+        l_foot = [lm[31].x, lm[31].y]
+        r_foot = [lm[32].x, lm[32].y]
+        nose = [lm[0].x, lm[0].y]
+
+        # Mid points
+        mid_shoulder = [(l_shoulder[0] + r_shoulder[0]) / 2,
+                        (l_shoulder[1] + r_shoulder[1]) / 2]
+        mid_hip = [(l_hip[0] + r_hip[0]) / 2,
+                   (l_hip[1] + r_hip[1]) / 2]
+        mid_knee = [(l_knee[0] + r_knee[0]) / 2,
+                    (l_knee[1] + r_knee[1]) / 2]
+
+        # 0-1: Knee angles (hip-knee-ankle)
+        left_knee_angle = _calc_angle(l_hip, l_knee, l_ankle)
+        right_knee_angle = _calc_angle(r_hip, r_knee, r_ankle)
+
+        # 2-3: Hip angles (shoulder-hip-knee)
+        left_hip_angle = _calc_angle(l_shoulder, l_hip, l_knee)
+        right_hip_angle = _calc_angle(r_shoulder, r_hip, r_knee)
+
+        # 4-5: Ankle angles (knee-ankle-foot)
+        left_ankle_angle = _calc_angle(l_knee, l_ankle, l_foot)
+        right_ankle_angle = _calc_angle(r_knee, r_ankle, r_foot)
+
+        # 6: Spine angle (nose-mid_shoulder-mid_hip)
+        spine_angle = _calc_angle(nose, mid_shoulder, mid_hip)
+
+        # 7: Torso lean (angle of torso from vertical)
+        # Vertical reference: point directly above mid_hip
+        vertical_ref = [mid_hip[0], mid_hip[1] - 0.5]
+        torso_lean = _calc_angle(mid_shoulder, mid_hip, vertical_ref)
+
+        # 8-9: Knee lateral deviation (how far knees go inward/outward vs ankles)
+        left_knee_lateral = l_knee[0] - l_ankle[0]
+        right_knee_lateral = r_knee[0] - r_ankle[0]
+
+        # 10: Symmetry score (1.0 = perfect symmetry)
+        knee_diff = abs(left_knee_angle - right_knee_angle)
+        hip_diff = abs(left_hip_angle - right_hip_angle)
+        symmetry_score = max(0.0, 1.0 - (knee_diff + hip_diff) / 180.0)
+
+        # 11: Hip depth (relative to knee height, higher = deeper squat)
+        # Positive means hips are below knees (deep squat)
+        hip_depth = mid_knee[1] - mid_hip[1]
+
+        return [
+            left_knee_angle, right_knee_angle,
+            left_hip_angle, right_hip_angle,
+            left_ankle_angle, right_ankle_angle,
+            spine_angle, torso_lean,
+            left_knee_lateral, right_knee_lateral,
+            symmetry_score, hip_depth
+        ]
+    except Exception as e:
+        print(f"Feature extraction error: {e}")
+        return None
+
+
+def _count_reps(knee_angles: List[float]) -> Dict[str, Any]:
+    """Count squat reps from knee angle time-series."""
+    if len(knee_angles) < 10:
+        return {"count": 0, "partial": 0, "rep_times": []}
+
+    valid_reps = 0
+    partial_reps = 0
+    
+    DEEP_THRESHOLD = 115   # below this = good deep squat
+    PARTIAL_THRESHOLD = 140 # below this but above 115 = shallow/partial squat
+    STAND_THRESHOLD = 160  # above this = standing straight
+
+    # States: 0=standing, 1=partial squat, 2=deep squat
+    state = 0 
+    rep_start = None
+    rep_times = []
+
+    for i, angle in enumerate(knee_angles):
+        if state == 0:
+            if angle < DEEP_THRESHOLD:
+                state = 2
+                rep_start = i
+            elif angle < PARTIAL_THRESHOLD:
+                state = 1
+                rep_start = i
+                
+        elif state == 1:
+            if angle < DEEP_THRESHOLD:
+                state = 2  # upgraded to deep squat
+            elif angle > STAND_THRESHOLD:
+                partial_reps += 1
+                state = 0
+                rep_start = None
+                
+        elif state == 2:
+            if angle > STAND_THRESHOLD:
+                valid_reps += 1
+                if rep_start is not None:
+                    rep_times.append(i - rep_start)
+                state = 0
+                rep_start = None
+
+    return {
+        "count": valid_reps,
+        "partial": partial_reps,
+        "rep_times": rep_times
+    }
+
+
+def _generate_feedback(
+    pred_class: int,
+    score: float,
+    confidence: float,
+    rep_info: Dict,
+    frame_features: List[List[float]]
+) -> str:
+    """Generate human-readable feedback string with emojis."""
+
+    E = {
+        'check': '\u2705', 'medal': '\U0001F3C5', 'bullet': '\u2022',
+        'muscle': '\U0001F4AA', 'target': '\U0001F3AF', 'fire': '\U0001F525',
+        'warning': '\u26A0\uFE0F', 'star': '\u2B50', 'brain': '\U0001F9E0',
+    }
+
+    form_label = LABEL_MAP.get(pred_class, "Unknown")
+    reps = rep_info.get("count", 0)
+    partial = rep_info.get("partial", 0)
+
+    # Build header
+    lines = [f"{E['muscle']} Squat Analysis:\n"]
+    lines.append(f"{E['bullet']} Valid Reps: {reps}")
+    if partial > 0:
+        lines.append(f"{E['bullet']} Partial Reps: {partial}")
+
+    # Consistency from rep times
+    rep_times = rep_info.get("rep_times", [])
+    if len(rep_times) > 1:
+        consistency = (1 - np.std(rep_times) / (np.mean(rep_times) + 1e-8)) * 100
+        consistency = max(0, min(100, consistency))
+        lines.append(f"{E['bullet']} Consistency: {consistency:.0f}%")
+        avg_rep = np.mean(rep_times)
+        lines.append(f"{E['bullet']} Avg Rep Time: {avg_rep:.1f} frames")
+
+    lines.append(f"\n{E['medal']} AI Score: {score:.0f}%")
+    lines.append(f"{E['target']} Form: {form_label} ({confidence:.0f}% confidence)")
+
+    # Form-specific suggestions
+    lines.append(f"\n{E['brain']} Suggestions:")
+
+    if pred_class == 0:
+        lines.append(f"{E['star']} Excellent form! Keep it up")
+        lines.append(f"{E['bullet']} Increase weight or reps to progress")
+    elif pred_class == 1:
+        lines.append(f"{E['warning']} Squat depth insufficient")
+        lines.append(f"{E['bullet']} Aim for thighs parallel to ground")
+        lines.append(f"{E['bullet']} Practice box squats for depth awareness")
+    elif pred_class == 2:
+        lines.append(f"{E['warning']} Excessive forward lean detected")
+        lines.append(f"{E['bullet']} Keep chest up, eyes forward")
+        lines.append(f"{E['bullet']} Strengthen upper back with rows")
+    elif pred_class == 3:
+        lines.append(f"{E['warning']} Knees caving inward")
+        lines.append(f"{E['bullet']} Push knees out over toes")
+        lines.append(f"{E['bullet']} Add hip abduction exercises")
+    elif pred_class == 4:
+        lines.append(f"{E['warning']} Heels lifting off ground")
+        lines.append(f"{E['bullet']} Work on ankle mobility")
+        lines.append(f"{E['bullet']} Try elevating heels with plates")
+    elif pred_class == 5:
+        lines.append(f"{E['warning']} Asymmetric movement detected")
+        lines.append(f"{E['bullet']} Add single-leg exercises")
+        lines.append(f"{E['bullet']} Check for muscle imbalances")
+
+    return "\n".join(lines)
+
+
+class SquatAnalyzer:
+    """
+    Analyzes squat videos using the trained Keras classifier.
+    Extracts 12 biomechanical features per frame,
+    classifies form, counts reps, and generates score + feedback.
+    """
+
+    def __init__(self):
+        _load_model()
+        
+        # Use new Tasks API which is compatible with Python 3.13
+        self.BaseOptions = mp.tasks.BaseOptions
+        self.PoseLandmarker = mp.tasks.vision.PoseLandmarker
+        self.PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
+        self.VisionRunningMode = mp.tasks.vision.RunningMode
+        
+        model_path = Path(__file__).parent.parent / "pose_landmarker_lite.task"
+        if not model_path.exists():
+            print(f"WARNING: Pose landmarker model not found at {model_path}")
+            
+        self.model_path = str(model_path)
+
+    def analyze_video(self, video_path: str) -> Dict[str, Any]:
+        """Main entry point: analyze a squat video and return results."""
+        try:
+            print(f"\n=== Squat Analysis (Trained Model): {video_path} ===")
+
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                return self._error("Could not open video file")
+
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            print(f"Video: {total_frames} frames @ {fps:.0f} FPS")
+
+            if total_frames < 15:
+                cap.release()
+                return self._error("Video too short for analysis")
+
+            # ---- Extract features from every frame ----
+            all_features = []
+            frames_processed = 0
+            poses_detected = 0
+
+            options = self.PoseLandmarkerOptions(
+                base_options=self.BaseOptions(model_asset_path=self.model_path),
+                running_mode=self.VisionRunningMode.VIDEO,
+                min_pose_detection_confidence=0.5,
+                min_pose_presence_confidence=0.5,
+                min_tracking_confidence=0.5
+            )
+
+            with self.PoseLandmarker.create_from_options(options) as landmarker:
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+
+                    # Calculate timestamp for VIDEO mode
+                    timestamp_ms = int((frames_processed * 1000) / fps)
+                    frames_processed += 1
+                    
+                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+                    
+                    try:
+                        results = landmarker.detect_for_video(mp_image, timestamp_ms)
+                    except Exception as e:
+                        print(f"Landmarker error at frame {frames_processed}: {e}")
+                        continue
+
+                    if results and results.pose_landmarks and len(results.pose_landmarks) > 0:
+                        poses_detected += 1
+                        feats = _extract_frame_features(results.pose_landmarks[0])
+                        if feats is not None:
+                            all_features.append(feats)
+
+            cap.release()
+
+            print(f"Frames: {frames_processed}, Poses: {poses_detected}, "
+                  f"Features: {len(all_features)}")
+
+            if len(all_features) < 10:
+                return self._error(
+                    "Not enough poses detected. Ensure full body is visible "
+                    "with good lighting."
+                )
+
+            detection_rate = poses_detected / frames_processed * 100
+            features_array = np.array(all_features, dtype=np.float32)
+
+            # ---- Count reps from knee angles ----
+            avg_knee_angles = (features_array[:, 0] + features_array[:, 1]) / 2
+            rep_info = _count_reps(avg_knee_angles.tolist())
+
+            # ---- Classify each frame ----
+            if _scaler is not None:
+                features_scaled = _scaler.transform(features_array)
+            else:
+                features_scaled = features_array
+
+            cls_preds, score_preds = _model.predict(features_scaled, verbose=0)
+
+            # ---- Aggregate per-frame predictions ----
+            frame_classes = np.argmax(cls_preds, axis=1)
+
+            # Overall class = most frequent prediction (mode)
+            unique, counts = np.unique(frame_classes, return_counts=True)
+            overall_class = int(unique[np.argmax(counts)])
+            class_confidence = float(counts[np.argmax(counts)] / len(frame_classes) * 100)
+
+            # ---- Smart scoring based on classification + reps ----
+            # 1. Form quality score (0-60 pts) based on per-frame class
+            #    Each class gets a form quality weight
+            CLASS_SCORES = {
+                0: 1.0,    # Correct = full marks
+                1: 0.55,   # Shallow = partial credit
+                2: 0.50,   # Forward Lean = partial
+                3: 0.45,   # Knees Caving = lower
+                4: 0.40,   # Heels Off = lower
+                5: 0.50,   # Asymmetric = partial
+            }
+            frame_quality = [CLASS_SCORES.get(int(c), 0.5) for c in frame_classes]
+            form_score = float(np.mean(frame_quality)) * 60  # 0-60 pts
+
+            # 2. Rep count bonus (0-25 pts)
+            reps = rep_info["count"]
+            partial = rep_info["partial"]
+            rep_bonus = min(25, reps * 4 + partial * 1.5)
+
+            # 3. Consistency bonus (0-15 pts)
+            consistency_bonus = 0.0
+            rep_times = rep_info.get("rep_times", [])
+            if len(rep_times) > 1:
+                cv = np.std(rep_times) / (np.mean(rep_times) + 1e-8)
+                consistency_bonus = max(0, (1 - cv)) * 15
+            elif reps >= 1:
+                consistency_bonus = 8  # 1 rep = partial credit
+
+            ai_score = form_score + rep_bonus + consistency_bonus
+            ai_score = float(max(10, min(100, ai_score)))
+
+            print(f"Score breakdown: form={form_score:.1f} + reps={rep_bonus:.1f} "
+                  f"+ consistency={consistency_bonus:.1f} = {ai_score:.1f}")
+
+            # ---- Form breakdown ----
+            form_breakdown = {}
+            for cls_id in range(6):
+                count = int(np.sum(frame_classes == cls_id))
+                if count > 0:
+                    form_breakdown[LABEL_MAP[cls_id]] = {
+                        "frames": count,
+                        "percentage": round(count / len(frame_classes) * 100, 1)
+                    }
+
+            # ---- Generate feedback ----
+            feedback = _generate_feedback(
+                overall_class, ai_score, class_confidence,
+                rep_info, all_features
+            )
+
+            # ---- Consistency score ----
+            consistency = 0.0
+            if len(rep_info["rep_times"]) > 1:
+                rt = rep_info["rep_times"]
+                consistency = (1 - np.std(rt) / (np.mean(rt) + 1e-8)) * 100
+                consistency = max(0, min(100, consistency))
+
+            print(f"Result: {reps} reps, score={ai_score:.1f}, "
+                  f"form={LABEL_MAP[overall_class]}")
+
+            return {
+                "success": True,
+                "count": reps,
+                "partial_squats": rep_info["partial"],
+                "ai_score": ai_score,
+                "form_class": overall_class,
+                "form_label": LABEL_MAP[overall_class],
+                "form_confidence": round(class_confidence, 1),
+                "form_breakdown": form_breakdown,
+                "consistency_score": round(consistency, 1),
+                "average_rep_time": (
+                    round(float(np.mean(rep_info["rep_times"])), 2)
+                    if rep_info["rep_times"] else 0.0
+                ),
+                "feedback": feedback,
+                "debug_info": {
+                    "frames_processed": frames_processed,
+                    "poses_detected": poses_detected,
+                    "detection_rate": f"{detection_rate:.1f}%",
+                    "features_extracted": len(all_features),
+                    "form_score": round(form_score, 1),
+                    "rep_bonus": round(rep_bonus, 1),
+                    "consistency_bonus": round(consistency_bonus, 1),
+                }
+            }
+
+        except Exception as e:
+            traceback.print_exc()
+            return self._error(str(e))
+
+    def _error(self, msg: str) -> Dict[str, Any]:
+        """Return standardized error result."""
+        print(f"ERROR: Squat analysis - {msg}")
+        return {
+            "success": False,
+            "count": 0,
+            "partial_squats": 0,
+            "ai_score": 0,
+            "form_class": -1,
+            "form_label": "Error",
+            "form_confidence": 0,
+            "form_breakdown": {},
+            "consistency_score": 0,
+            "average_rep_time": 0,
+            "feedback": f"\U0001F6AB Analysis failed: {msg}",
+            "error": msg
+        }
