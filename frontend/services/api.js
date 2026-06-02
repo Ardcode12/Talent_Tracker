@@ -14,11 +14,11 @@ const getApiUrl = () => {
     // To find your IP on Windows: run 'ipconfig' in cmd
     // Look for IPv4 Address under your active network adapter
 
-    return 'http://10.61.77.35:8000'; // UPDATE THIS WITH YOUR IP
+    return 'http://10.178.79.35:8000'; // UPDATE THIS WITH YOUR IP
   }
 };
 
-const API_BASE_URL = `${getApiUrl()}/api`;
+export const API_BASE_URL = `${getApiUrl()}/api`;
 const BASE_URL = getApiUrl();
 
 // Add logging to debug

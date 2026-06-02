@@ -23,7 +23,7 @@ import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // At the top of ConnectionsScreen.tsx
-import { getImageUrl, getImageUrlWithFallback, startConversation } from '../services/api';
+import { getImageUrl, getImageUrlWithFallback, startConversation, API_BASE_URL } from '../services/api';
 
 import { useNavigation } from '@react-navigation/native';
 
@@ -31,7 +31,7 @@ import { useNavigation } from '@react-navigation/native';
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const API_URL = 'http://10.181.133.35:8000/api'; // Update with your backend URL
+const API_URL = API_BASE_URL; // Update with your backend URL
 
 // Interfaces
 interface Connection {
@@ -114,19 +114,6 @@ export default function ConnectionsScreen() {
       'Content-Type': 'application/json',
       ...options.headers,
     };
-    // Add this function after your other handler functions
-    const handleMessage = async (user: Connection) => {
-      try {
-        const response = await startConversation(user.id);
-        navigation.navigate('ChatScreen', {
-          conversationId: response.conversation_id,
-          otherUser: user
-        });
-      } catch (error) {
-        console.error('Error starting conversation:', error);
-        Alert.alert('Error', 'Failed to start conversation');
-      }
-    };
 
     const response = await fetch(url, {
       ...options,
@@ -138,6 +125,20 @@ export default function ConnectionsScreen() {
     }
 
     return response.json();
+  };
+
+  // Handle starting a conversation with a user
+  const handleMessage = async (user: Connection) => {
+    try {
+      const response = await startConversation(user.id);
+      navigation.navigate('ChatScreen', {
+        conversationId: response.conversation_id,
+        otherUser: user
+      });
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+      Alert.alert('Error', 'Failed to start conversation');
+    }
   };
 
   // Fetch all data
