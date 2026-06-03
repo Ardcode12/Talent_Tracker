@@ -1,22 +1,19 @@
 """
-Utility helpers for loading the shuttle-run classifier/regressor and running
-predictions.  The objects are cached in module-level globals so they are
-loaded only once per   Uvicorn worker process.
+Shuttle-Run model utilities — loads the trained Keras classifier and runs
+predictions.  Objects are cached in module-level globals (loaded once per worker).
 
-Expected artefacts (already present in ml_models/shuttle_run/models):
-    ├── shuttle_run_model_best.keras  (Keras functional model)
-    ├── shuttle_run_model_scaler.pkl  (sklearn.StandardScaler)
-    ├── shuttle_run_label_encoder.pkl (sklearn.LabelEncoder)
-    └── shuttle_run_feature_names.pkl (list[str] – feature order used at train)
-
-If any of the “*_best.keras” files are missing we fall back to
-“shuttle_run_model_final.keras”.
+Expected artefacts in ml_models/shuttle_run/models/:
+    ├── shuttle_run_model_best.keras   (Sequential classifier)
+    ├── shuttle_run_model_scaler.pkl   (StandardScaler)
+    ├── shuttle_run_label_encoder.pkl  (LabelEncoder)
+    ├── shuttle_run_feature_names.pkl  (list[str])
+    └── shuttle_run_model_config.json  (metadata)
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import joblib
 import numpy as np
@@ -28,14 +25,15 @@ MODELS_DIR = BASE_DIR / "models"
 # ---------------------------------------------------------------------------
 # Lazy-loaded singletons
 # ---------------------------------------------------------------------------
-_MODEL = None          # type: tf.keras.Model | None
-_SCALER = None         # type: joblib.BaseEstimator | None
-_LABEL_ENCODER = None  # type: joblib.BaseEstimator | None
+_MODEL = None
+_SCALER = None
+_LABEL_ENCODER = None
 _FEATURE_NAMES: List[str] | None = None
+_CONFIG: Dict | None = None
 
 
 def _load_artifacts() -> None:
-    global _MODEL, _SCALER, _LABEL_ENCODER, _FEATURE_NAMES
+    global _MODEL, _SCALER, _LABEL_ENCODER, _FEATURE_NAMES, _CONFIG
 
     # --- Keras model ---
     model_path = (
@@ -44,16 +42,22 @@ def _load_artifacts() -> None:
         else MODELS_DIR / "shuttle_run_model_final.keras"
     )
     _MODEL = tf.keras.models.load_model(model_path)
-    _MODEL.make_predict_function()  # warm-up
+    print(f"[ShuttleRun] Loaded model: {model_path.name}")
 
     # --- Scaler / encoder / feature names ---
     _SCALER = joblib.load(MODELS_DIR / "shuttle_run_model_scaler.pkl")
     _LABEL_ENCODER = joblib.load(MODELS_DIR / "shuttle_run_label_encoder.pkl")
     _FEATURE_NAMES = joblib.load(MODELS_DIR / "shuttle_run_feature_names.pkl")
 
+    # --- Config ---
+    config_path = MODELS_DIR / "shuttle_run_model_config.json"
+    if config_path.exists():
+        with open(config_path) as f:
+            _CONFIG = json.load(f)
+
     print(
-        f"[ShuttleRun]  model = {model_path.name}  "
-        f"features = {len(_FEATURE_NAMES)}  classes = {_LABEL_ENCODER.classes_.tolist()}"
+        f"[ShuttleRun] features={len(_FEATURE_NAMES)}  "
+        f"classes={_LABEL_ENCODER.classes_.tolist()}"
     )
 
 
@@ -70,28 +74,38 @@ def get_feature_names() -> List[str]:
     return list(_FEATURE_NAMES)
 
 
-def preprocess_features(raw: List[float]) -> np.ndarray:
-    """
-    • Accepts the raw 1-D feature list (length must equal n_features).
-    • Returns a scaled numpy array shaped (1, n_features).
-    """
+def get_num_features() -> int:
     _ensure_loaded()
-    if len(raw) != len(_FEATURE_NAMES):
-        raise ValueError(
-            f"Expected {len(_FEATURE_NAMES)} features, got {len(raw)} instead."
-        )
+    return len(_FEATURE_NAMES)
+
+
+def preprocess_features(raw: List[float]) -> np.ndarray:
+    """Scale a raw feature vector → shape (1, n_features)."""
+    _ensure_loaded()
+    n = len(_FEATURE_NAMES)
+    if len(raw) != n:
+        raise ValueError(f"Expected {n} features, got {len(raw)}")
     X = np.asarray(raw, dtype=np.float32).reshape(1, -1)
-    X_scaled = _SCALER.transform(X)
-    return X_scaled
+    return _SCALER.transform(X)
+
+
+# Band → base score mapping
+_BAND_TO_BASE = {
+    "Excellent":     95,
+    "Very Good":     82,
+    "Good":          70,
+    "Average":       55,
+    "Below Average": 35,
+}
 
 
 def predict(raw_features: List[float]) -> Dict[str, float | str]:
     """
-    Given a raw feature vector, return:
+    Given a raw feature vector (length = n_features), return:
         {
-          "band_label": "Excellent",
-          "probability": 0.82,
-          "numeric_score": 91.0      # 0-100 derived from class & prob
+          "band_label": "Very Good",
+          "probability": 0.87,
+          "numeric_score": 82.3
         }
     """
     _ensure_loaded()
@@ -103,17 +117,10 @@ def predict(raw_features: List[float]) -> Dict[str, float | str]:
     band_label = str(_LABEL_ENCODER.inverse_transform([top_idx])[0])
     prob = float(y_proba[top_idx])
 
-    # Simple 0-100 score where each class gets a band midpoint and is nudged by confidence
-    _band_to_base = {
-        "Elite": 100,
-        "Excellent": 90,
-        "Very Good": 80,
-        "Good": 70,
-        "Average": 60,
-        "Below Average": 45,
-    }
-    base = _band_to_base.get(band_label, 50)
+    # Score = base * confidence + (1-confidence) * (base - 10)
+    base = _BAND_TO_BASE.get(band_label, 50)
     numeric_score = base * prob + (1 - prob) * (base - 10)
+    numeric_score = max(5, min(100, numeric_score))
 
     return {
         "band_label": band_label,
