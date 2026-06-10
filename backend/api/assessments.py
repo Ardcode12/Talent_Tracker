@@ -16,6 +16,7 @@ import random, shutil, traceback
 from ml_models.squat.squat_analyzer import SquatAnalyzer
 from ml_models.shuttle_run.shuttle_run_analyzer import ShuttleRunAnalyzer
 from ml_models.vertical_jump_analyzer import VerticalJumpAnalyzer
+from ml_models.situp.situp_analyzer import SitUpAnalyzer
 
 router = APIRouter(prefix="/api/assessments", tags=["assessments"])
 
@@ -186,7 +187,22 @@ async def upload_assessment(
 
         elif test_type == "vertical_jump":
             vja = VerticalJumpAnalyzer()
-            result = vja.analyze_video(str(file_path))
+            # Extract athlete's weight and height from their profile for power calculation
+            athlete_weight = None
+            athlete_height = None
+            try:
+                if current_user.weight:
+                    athlete_weight = float(current_user.weight)
+                if current_user.height:
+                    athlete_height = float(current_user.height)
+            except (ValueError, TypeError):
+                pass  # weight/height not set or invalid — analyzer handles None gracefully
+
+            result = vja.analyze_video(
+                str(file_path),
+                weight_kg=athlete_weight,
+                height_cm=athlete_height,
+            )
             if result.get("success"):
                 ai_score = result["ai_score"]
                 feedback = result.get("feedback", "")
@@ -196,14 +212,16 @@ async def upload_assessment(
                 ai_score = 0
 
         elif test_type == "height_detection":
-            detected = 160 + random.random() * 40
-            ai_score = 95 + random.random() * 5
-            feedback = (
-                f"{EMOJI['ruler']} Height Detection:\n\n"
-                f"{EMOJI['bullet']} Estimated height: {detected:.1f} cm\n"
-                f"{EMOJI['bullet']} Confidence: {ai_score:.1f}%\n\n"
-                f"{EMOJI['check_mark']} Recorded successfully!"
-            )
+            sua = SitUpAnalyzer()
+            result = sua.analyze_video(str(file_path))
+            if result.get("success"):
+                ai_score = result["ai_score"]
+                feedback = result.get("feedback", "")
+                analysis_result = result
+            else:
+                feedback = f"{EMOJI['no_entry']} Sit-up analysis failed: {result.get('error', 'Unknown error')}"
+                ai_score = 0
+                analysis_result = result
 
         # Save assessment to database
         assessment = models.Assessment(

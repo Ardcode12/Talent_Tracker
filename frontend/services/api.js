@@ -14,7 +14,7 @@ const getApiUrl = () => {
     // To find your IP on Windows: run 'ipconfig' in cmd
     // Look for IPv4 Address under your active network adapter
 
-    return 'http://10.178.79.35:8000'; // UPDATE THIS WITH YOUR IP
+    return 'http://10.88.201.35:8000'; // UPDATE THIS WITH YOUR IP
   }
 };
 
@@ -947,13 +947,20 @@ class ApiService {
         throw new Error('Authentication required');
       }
 
+      // Long timeout for video analysis (5 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
       const response = await fetch(`${API_BASE_URL}/assessments/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         },
         body: formData,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json();
       if (!response.ok) {
@@ -961,10 +968,14 @@ class ApiService {
       }
       return data;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Analysis timed out. Please try a shorter video (under 2 minutes).');
+      }
       console.error('Assessment upload error:', error);
       throw error;
     }
   }
+
 
   static async getAssessments(testType = null) {
     try {

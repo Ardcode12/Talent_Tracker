@@ -30,6 +30,8 @@ export default function ProfileCompletionScreen({ navigation }) {
   const [profileImage, setProfileImage] = useState(null);
   const [age, setAge] = useState('');
   const [location, setLocation] = useState('');
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [userData, setUserData] = useState(null);
 
@@ -105,17 +107,20 @@ export default function ProfileCompletionScreen({ navigation }) {
   };
 
   const validateForm = () => {
-    // Make profile image optional for now
-    // if (!profileImage) {
-    //   Alert.alert('Error', 'Please upload your profile image');
-    //   return false;
-    // }
     if (!age || isNaN(age) || parseInt(age) < 5 || parseInt(age) > 100) {
       Alert.alert('Error', 'Please enter a valid age between 5 and 100');
       return false;
     }
     if (!location || location.trim().length < 3) {
       Alert.alert('Error', 'Please enter your location');
+      return false;
+    }
+    if (!height || isNaN(height) || parseFloat(height) < 50 || parseFloat(height) > 250) {
+      Alert.alert('Error', 'Please enter a valid height between 50 and 250 cm');
+      return false;
+    }
+    if (!weight || isNaN(weight) || parseFloat(weight) < 20 || parseFloat(weight) > 300) {
+      Alert.alert('Error', 'Please enter a valid weight between 20 and 300 kg');
       return false;
     }
     return true;
@@ -139,6 +144,8 @@ const handleSubmit = async () => {
     formData.append('userId', userData.id.toString());
     formData.append('age', age.toString());
     formData.append('location', location);
+    formData.append('height', height.toString());
+    formData.append('weight', weight.toString());
     
     // Add profile image if exists
     if (profileImage) {
@@ -197,6 +204,8 @@ const handleSubmit = async () => {
         ...response.user,
         age: parseInt(age),
         location: location,
+        height: height,
+        weight: weight,
         profile_image: response.user.profile_image,
         profile_photo: response.user.profile_image,
       };
@@ -379,6 +388,44 @@ const handleSkip = async () => {
             </Text>
           </View>
 
+          {/* Height Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Height (cm) *</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 175"
+                placeholderTextColor={Theme.colors.textSecondary}
+                value={height}
+                onChangeText={(text) => setHeight(text.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                maxLength={5}
+                editable={!loading}
+              />
+              <Ionicons name="resize-outline" size={20} color={Theme.colors.textSecondary} style={styles.inputIcon} />
+            </View>
+            <Text style={styles.inputHelper}>Used for accurate jump height measurement</Text>
+          </View>
+
+          {/* Weight Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Weight (kg) *</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 70"
+                placeholderTextColor={Theme.colors.textSecondary}
+                value={weight}
+                onChangeText={(text) => setWeight(text.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                maxLength={5}
+                editable={!loading}
+              />
+              <Ionicons name="barbell-outline" size={20} color={Theme.colors.textSecondary} style={styles.inputIcon} />
+            </View>
+            <Text style={styles.inputHelper}>Used to calculate explosive power output</Text>
+          </View>
+
           {/* Progress Indicator */}
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
@@ -387,16 +434,18 @@ const handleSkip = async () => {
                   styles.progressFill,
                   { 
                     width: `${
-                      (profileImage ? 20 : 0) + 
-                      (age ? 40 : 0) + 
-                      (location ? 40 : 0)
+                      (profileImage ? 10 : 0) + 
+                      (age ? 22 : 0) + 
+                      (location ? 22 : 0) +
+                      (height ? 23 : 0) +
+                      (weight ? 23 : 0)
                     }%` 
                   }
                 ]}
               />
             </View>
             <Text style={styles.progressText}>
-              {age && location 
+              {age && location && height && weight
                 ? 'All required fields completed!' 
                 : 'Fill in required fields (*) to continue'}
             </Text>
@@ -407,14 +456,14 @@ const handleSkip = async () => {
             style={[
               styles.submitButton, 
               loading && styles.submitButtonDisabled,
-              (!age || !location) && styles.submitButtonIncomplete
+              (!age || !location || !height || !weight) && styles.submitButtonIncomplete
             ]}
             onPress={handleSubmit}
-            disabled={loading || !age || !location}
+            disabled={loading || !age || !location || !height || !weight}
           >
             <LinearGradient
               colors={
-                age && location 
+                age && location && height && weight
                   ? Theme.colors.gradient.primary 
                   : ['#666', '#555']
               }

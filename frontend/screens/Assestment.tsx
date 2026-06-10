@@ -52,7 +52,13 @@ const ASSESSMENT_TESTS = [
     icon: 'directions-run', 
     color: '#FF6B6B', 
     unit: 'seconds', 
-    description: 'Test your agility and speed' 
+    description: 'Test your agility and speed',
+    instructions: [
+      'Take the video from a straight, side-on angle covering the entire 10m track.',
+      'A 10-meter running distance is compulsory.',
+      'Exactly 4 laps (direction changes) must be completed.',
+      'Ensure the full body is visible at all times.'
+    ]
   },
   { 
     id: 'vertical_jump', // ✅ Changed from vertical_jump
@@ -60,7 +66,13 @@ const ASSESSMENT_TESTS = [
     icon: 'trending-up', 
     color: '#4ECDC4', 
     unit: 'cm', 
-    description: 'Measure explosive power' 
+    description: 'Measure explosive power',
+    instructions: [
+      'Take the video from a straight, side-on angle.',
+      'Ensure your full body (head to feet) is visible throughout the jump.',
+      'Start recording before the jump and stop after landing.',
+      'Normal 30fps video works — slow-motion also supported for better accuracy.',
+    ]
   },
   { 
     id: 'squats',
@@ -68,7 +80,13 @@ const ASSESSMENT_TESTS = [
     icon: 'fitness-center', 
     color: '#45B7D1', 
     unit: 'reps', 
-    description: 'Test lower body strength' 
+    description: 'Test lower body strength',
+    instructions: [
+      'Take the video from a straight, side-on angle.',
+      'Perform as many continuous reps as possible.',
+      'Ensure the hips go below the knees for a valid rep.',
+      'Aim for 50+ reps for an Elite score!'
+    ]
   },
   { 
     id: 'height_detection',
@@ -76,13 +94,19 @@ const ASSESSMENT_TESTS = [
     icon: 'self-improvement', 
     color: '#F7DC6F', 
     unit: 'cm', 
-    description: 'Test Core Strength' 
+    description: 'Test Core Strength',
+    instructions: [
+      'Take the video from a straight, side-on angle.',
+      'Ensure the full body is visible.',
+      'Perform continuous repetitions with proper form.'
+    ]
   },
 ];
 
 export default function AssessmentScreen() {
   const [selectedTest, setSelectedTest] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [modalStep, setModalStep] = useState(1);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [assessments, setAssessments] = useState([]);
@@ -268,6 +292,7 @@ export default function AssessmentScreen() {
       style={styles.testCard} 
       onPress={() => { 
         setSelectedTest(item); 
+        setModalStep(1);
         setShowUploadModal(true); 
       }}
     >
@@ -353,15 +378,47 @@ export default function AssessmentScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={styles.uploadOption} onPress={handleVideoUpload}>
-                  <Ionicons name="cloud-upload" size={32} color={Theme.colors.primary} />
-                  <Text style={styles.uploadOptionText}>Upload Video</Text>
-                </TouchableOpacity>
+                {modalStep === 1 ? (
+                  <>
+                    {selectedTest?.instructions && (
+                      <View style={styles.instructionsContainer}>
+                        <Text style={styles.instructionsTitle}>Instructions:</Text>
+                        {selectedTest.instructions.map((inst: string, index: number) => (
+                          <Text key={index} style={styles.instructionText}>
+                            • {inst}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                    <TouchableOpacity 
+                      style={styles.nextButton} 
+                      onPress={() => setModalStep(2)}
+                    >
+                      <Text style={styles.nextButtonText}>Next</Text>
+                      <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.uploadOption} onPress={handleVideoUpload}>
+                      <Ionicons name="cloud-upload" size={32} color={Theme.colors.primary} />
+                      <Text style={styles.uploadOptionText}>Upload Video</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity style={styles.uploadOption} onPress={handleLiveRecording}>
-                  <Ionicons name="videocam" size={32} color={Theme.colors.secondary} />
-                  <Text style={styles.uploadOptionText}>Record Live</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity style={styles.uploadOption} onPress={handleLiveRecording}>
+                      <Ionicons name="videocam" size={32} color={Theme.colors.secondary} />
+                      <Text style={styles.uploadOptionText}>Record Live</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.backButton} 
+                      onPress={() => setModalStep(1)}
+                    >
+                      <Ionicons name="arrow-back" size={20} color="#ccc" />
+                      <Text style={styles.backButtonText}>Back to Instructions</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </>
             )}
           </View>
@@ -452,6 +509,13 @@ notAuthenticatedText: {
   modalContent: { backgroundColor: Theme.colors.elevated, borderTopLeftRadius: Theme.borderRadius.xl, borderTopRightRadius: Theme.borderRadius.xl, padding: Theme.spacing.xl, paddingBottom: 40 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Theme.spacing.xl },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Theme.colors.text },
+  instructionsContainer: { backgroundColor: 'rgba(255,255,255,0.05)', padding: 15, borderRadius: 10, marginBottom: 20 },
+  instructionsTitle: { color: Theme.colors.primary, fontSize: 16, fontWeight: 'bold', marginBottom: 8 },
+  instructionText: { color: '#ccc', fontSize: 14, marginBottom: 4, lineHeight: 20 },
+  nextButton: { backgroundColor: Theme.colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, borderRadius: Theme.borderRadius.md, marginTop: 10, gap: 8 },
+  nextButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  backButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, marginTop: 10, gap: 8 },
+  backButtonText: { color: '#ccc', fontSize: 16 },
   uploadOption: { alignItems: 'center', padding: Theme.spacing.xl, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: Theme.borderRadius.lg, marginBottom: Theme.spacing.lg },
   uploadOptionText: { fontSize: 16, color: Theme.colors.text, marginTop: Theme.spacing.sm },
   analyzingContainer: { alignItems: 'center', padding: Theme.spacing.xl * 2 },

@@ -31,6 +31,38 @@ LABEL_MAP = {
     5: "Asymmetric Squat"
 }
 
+# Scoring table: (min_reps, score)
+# Based on standard physical fitness test norms for squats
+_SCORE_TABLE = [
+    (50, 100),
+    (45, 90),
+    (40, 80),
+    (35, 70),
+    (30, 60),
+    (25, 50),
+    (20, 40),
+    (15, 30),
+    (10, 20),
+    (5,  10),
+    (0,   0),
+]
+
+
+def _score_from_reps(reps: int) -> float:
+    for threshold, pts in _SCORE_TABLE:
+        if reps >= threshold:
+            return float(pts)
+    return 0.0
+
+
+def _band_from_reps(reps: int) -> tuple:
+    if reps >= 50: return "Elite",         "\U0001F31F"
+    if reps >= 40: return "Excellent",     "\U0001F3AF"
+    if reps >= 30: return "Very Good",     "\U0001F3C5"
+    if reps >= 20: return "Good",          "\U0001F44D"
+    if reps >= 10: return "Average",       "\U0001F4CA"
+    return             "Below Average",    "\U0001F4AA"
+
 
 def _load_model():
     """Lazy-load the trained model, scaler, and config."""
@@ -217,7 +249,9 @@ def _generate_feedback(
     score: float,
     confidence: float,
     rep_info: Dict,
-    frame_features: List[List[float]]
+    frame_features: List[List[float]],
+    band: str = "Average",
+    band_icon: str = "\U0001F4CA"
 ) -> str:
     """Generate human-readable feedback string with emojis."""
 
@@ -231,50 +265,46 @@ def _generate_feedback(
     reps = rep_info.get("count", 0)
     partial = rep_info.get("partial", 0)
 
-    # Build header
-    lines = [f"{E['muscle']} Squat Analysis:\n"]
+    lines = [f"{E['muscle']} Squat Analysis\n"]
+    lines.append(f"{band_icon} Performance: {band}")
+    lines.append(f"{E['bullet']} AI Score: {score:.1f}%")
+    lines.append(f"\n--- Results ---")
     lines.append(f"{E['bullet']} Valid Reps: {reps}")
     if partial > 0:
-        lines.append(f"{E['bullet']} Partial Reps: {partial}")
-
-    # Consistency from rep times
-    rep_times = rep_info.get("rep_times", [])
-    if len(rep_times) > 1:
-        consistency = (1 - np.std(rep_times) / (np.mean(rep_times) + 1e-8)) * 100
-        consistency = max(0, min(100, consistency))
-        lines.append(f"{E['bullet']} Consistency: {consistency:.0f}%")
-        avg_rep = np.mean(rep_times)
-        lines.append(f"{E['bullet']} Avg Rep Time: {avg_rep:.1f} frames")
-
-    lines.append(f"\n{E['medal']} AI Score: {score:.0f}%")
+        lines.append(f"{E['bullet']} Partial Reps (too shallow): {partial}")
     lines.append(f"{E['target']} Form: {form_label} ({confidence:.0f}% confidence)")
 
-    # Form-specific suggestions
-    lines.append(f"\n{E['brain']} Suggestions:")
+    # Band-based performance advice
+    advice_map = {
+        "Elite":         f"{E['fire']} Elite level! You are in peak physical condition.",
+        "Excellent":     f"{E['star']} Excellent! Push for 50+ reps to reach Elite.",
+        "Very Good":     f"{E['medal']} Very Good! Build leg strength with weighted squats.",
+        "Good":          f"{E['target']} Good! Add squat-specific training to boost your count.",
+        "Average":       f"{E['muscle']} Keep going! Consistency will improve your strength.",
+        "Below Average": f"{E['bullet']} Start slow and build up gradually. Daily practice helps.",
+    }
+    lines.append(f"\n{advice_map.get(band, 'Keep pushing!')}")
 
-    if pred_class == 0:
-        lines.append(f"{E['star']} Excellent form! Keep it up")
-        lines.append(f"{E['bullet']} Increase weight or reps to progress")
-    elif pred_class == 1:
-        lines.append(f"{E['warning']} Squat depth insufficient")
-        lines.append(f"{E['bullet']} Aim for thighs parallel to ground")
+    # Form-specific correction tips
+    if pred_class != 0:
+        lines.append(f"\n{E['brain']} Form Tips:")
+    if pred_class == 1:
+        lines.append(f"{E['warning']} Squat depth insufficient — aim for thighs parallel to ground")
         lines.append(f"{E['bullet']} Practice box squats for depth awareness")
     elif pred_class == 2:
-        lines.append(f"{E['warning']} Excessive forward lean detected")
-        lines.append(f"{E['bullet']} Keep chest up, eyes forward")
+        lines.append(f"{E['warning']} Excessive forward lean — keep chest up, eyes forward")
         lines.append(f"{E['bullet']} Strengthen upper back with rows")
     elif pred_class == 3:
-        lines.append(f"{E['warning']} Knees caving inward")
-        lines.append(f"{E['bullet']} Push knees out over toes")
+        lines.append(f"{E['warning']} Knees caving inward — push knees out over toes")
         lines.append(f"{E['bullet']} Add hip abduction exercises")
     elif pred_class == 4:
-        lines.append(f"{E['warning']} Heels lifting off ground")
-        lines.append(f"{E['bullet']} Work on ankle mobility")
-        lines.append(f"{E['bullet']} Try elevating heels with plates")
+        lines.append(f"{E['warning']} Heels lifting — work on ankle mobility")
+        lines.append(f"{E['bullet']} Try elevating heels slightly with plates")
     elif pred_class == 5:
-        lines.append(f"{E['warning']} Asymmetric movement detected")
-        lines.append(f"{E['bullet']} Add single-leg exercises")
+        lines.append(f"{E['warning']} Asymmetric movement — add single-leg exercises")
         lines.append(f"{E['bullet']} Check for muscle imbalances")
+
+
 
     return "\n".join(lines)
 
@@ -370,8 +400,38 @@ class SquatAnalyzer:
             detection_rate = poses_detected / frames_processed * 100
             features_array = np.array(all_features, dtype=np.float32)
 
-            # ---- Count reps from knee angles ----
+            # Compute avg knee angles early — used by both validation and rep counting
             avg_knee_angles = (features_array[:, 0] + features_array[:, 1]) / 2
+
+            # ---- Validate: is this actually a squat video? ----
+            # Feature col 11 = hip_depth (positive = hip below knee level)
+            # Feature col 7  = torso_lean
+            # For a valid squat:
+            #   1. The knee angle range must show significant bending
+            #   2. Body should not be moving significantly across the frame (not running/walking)
+            hip_depth_series = features_array[:, 11]   # vertical hip oscillation
+            torso_lean_series = features_array[:, 7]    # body lean angle
+            
+            knee_angle_range = float(np.max(avg_knee_angles) - np.min(avg_knee_angles))
+            hip_depth_range = float(np.max(hip_depth_series) - np.min(hip_depth_series))
+            torso_lean_std = float(np.std(torso_lean_series))
+
+            print(f"Validation — knee_angle_range: {knee_angle_range:.1f}°, "
+                  f"hip_depth_range: {hip_depth_range:.4f}, torso_lean_std: {torso_lean_std:.4f}")
+
+            # Reject: body barely moved — likely a stationary video or wrong exercise
+            if knee_angle_range < 20:
+                return self._error(
+                    "This is not a squat video. Please upload a valid squat video."
+                )
+
+            # Reject: body lean varies wildly — likely running/lateral movement, not squatting
+            if torso_lean_std > 25:
+                return self._error(
+                    "This is not a squat video. Please upload a valid squat video."
+                )
+
+            # ---- Count reps from knee angles ----
             rep_info = _count_reps(avg_knee_angles.tolist())
 
             # ---- Classify each frame ----
@@ -390,39 +450,28 @@ class SquatAnalyzer:
             overall_class = int(unique[np.argmax(counts)])
             class_confidence = float(counts[np.argmax(counts)] / len(frame_classes) * 100)
 
-            # ---- Smart scoring based on classification + reps ----
-            # 1. Form quality score (0-60 pts) based on per-frame class
-            #    Each class gets a form quality weight
-            CLASS_SCORES = {
-                0: 1.0,    # Correct = full marks
-                1: 0.55,   # Shallow = partial credit
-                2: 0.50,   # Forward Lean = partial
-                3: 0.45,   # Knees Caving = lower
-                4: 0.40,   # Heels Off = lower
-                5: 0.50,   # Asymmetric = partial
-            }
-            frame_quality = [CLASS_SCORES.get(int(c), 0.5) for c in frame_classes]
-            form_score = float(np.mean(frame_quality)) * 60  # 0-60 pts
-
-            # 2. Rep count bonus (0-25 pts)
+            # ---- Rep-count based scoring (same system as sit-ups) ----
             reps = rep_info["count"]
             partial = rep_info["partial"]
-            rep_bonus = min(25, reps * 4 + partial * 1.5)
 
-            # 3. Consistency bonus (0-15 pts)
-            consistency_bonus = 0.0
-            rep_times = rep_info.get("rep_times", [])
-            if len(rep_times) > 1:
-                cv = np.std(rep_times) / (np.mean(rep_times) + 1e-8)
-                consistency_bonus = max(0, (1 - cv)) * 15
-            elif reps >= 1:
-                consistency_bonus = 8  # 1 rep = partial credit
+            base_score = _score_from_reps(reps)
+            band, band_icon = _band_from_reps(reps)
 
-            ai_score = form_score + rep_bonus + consistency_bonus
-            ai_score = float(max(10, min(100, ai_score)))
+            # Form quality multiplier 0.7x–1.0x based on per-frame classification
+            CLASS_QUALITY = {
+                0: 1.0,   # Correct = full marks
+                1: 0.75,  # Shallow
+                2: 0.70,  # Forward Lean
+                3: 0.65,  # Knees Caving
+                4: 0.65,  # Heels Off
+                5: 0.75,  # Asymmetric
+            }
+            frame_quality = [CLASS_QUALITY.get(int(c), 0.7) for c in frame_classes]
+            quality = float(np.mean(frame_quality))   # 0.65 – 1.0
 
-            print(f"Score breakdown: form={form_score:.1f} + reps={rep_bonus:.1f} "
-                  f"+ consistency={consistency_bonus:.1f} = {ai_score:.1f}")
+            ai_score = float(min(100.0, base_score * quality))
+
+            print(f"Score: {reps} reps → base={base_score:.0f} × quality={quality:.2f} = {ai_score:.1f}")
 
             # ---- Form breakdown ----
             form_breakdown = {}
@@ -437,7 +486,7 @@ class SquatAnalyzer:
             # ---- Generate feedback ----
             feedback = _generate_feedback(
                 overall_class, ai_score, class_confidence,
-                rep_info, all_features
+                rep_info, all_features, band, band_icon
             )
 
             # ---- Consistency score ----
@@ -470,9 +519,8 @@ class SquatAnalyzer:
                     "poses_detected": poses_detected,
                     "detection_rate": f"{detection_rate:.1f}%",
                     "features_extracted": len(all_features),
-                    "form_score": round(form_score, 1),
-                    "rep_bonus": round(rep_bonus, 1),
-                    "consistency_bonus": round(consistency_bonus, 1),
+                    "base_score": round(base_score, 1),
+                    "quality_multiplier": round(quality, 2),
                 }
             }
 
