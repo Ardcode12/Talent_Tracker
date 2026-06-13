@@ -395,28 +395,28 @@ async def get_notifications(
             print(f"Could not fetch connection accepted notifications: {e}")
         
         # ============================================
-        # 9. NEW ASSESSMENT RESULTS (if applicable)
+        # 9. DB-STORED NOTIFICATIONS (assessment_complete, assessment_failed, etc.)
         # ============================================
         try:
-            recent_assessments = db.query(models.Assessment).filter(
-                models.Assessment.user_id == current_user.id,
-                models.Assessment.status == 'completed',
-                models.Assessment.created_at >= yesterday
-            ).order_by(models.Assessment.created_at.desc()).limit(3).all()
-            
-            for assessment in recent_assessments:
+            db_notifications = db.query(models.Notification).filter(
+                models.Notification.user_id == current_user.id
+            ).order_by(models.Notification.created_at.desc()).limit(20).all()
+
+            for notif in db_notifications:
                 notifications.append({
-                    "id": f"assessment_{assessment.id}",
-                    "type": "assessment_complete",
-                    "title": "Assessment Complete",
-                    "message": f"Your {assessment.test_type} assessment is ready! Score: {assessment.ai_score}%",
-                    "action_url": f"/assessments/{assessment.id}",
-                    "is_read": False,
-                    "created_at": assessment.created_at.isoformat()
+                    "id": f"db_{notif.id}",
+                    "type": notif.type,
+                    "title": notif.title,
+                    "message": notif.message,
+                    "reference_id": notif.reference_id,
+                    "action_url": f"/assessments/{notif.reference_id}" if notif.reference_id else "/assessments",
+                    "is_read": notif.is_read,
+                    "created_at": notif.created_at.isoformat(),
+                    "db_notification_id": notif.id,
                 })
         except Exception as e:
-            print(f"Could not fetch assessment notifications: {e}")
-        
+            print(f"Could not fetch DB notifications: {e}")
+
         # ============================================
         # SORT AND PAGINATE
         # ============================================
@@ -536,8 +536,21 @@ async def get_notification_count(
             count += mentions
         except Exception:
             pass  # CommentReply table might not exist
-        
+
+        # ============================================
+        # 6. UNREAD DB NOTIFICATIONS (assessment results)
+        # ============================================
+        try:
+            unread_db_notifs = db.query(models.Notification).filter(
+                models.Notification.user_id == current_user.id,
+                models.Notification.is_read == False
+            ).count()
+            count += unread_db_notifs
+        except Exception:
+            pass
+
         return {"count": count}
+
         
     except Exception:
         traceback.print_exc()
@@ -577,10 +590,17 @@ async def mark_all_notifications_read(
             models.Message.sender_id != current_user.id,
             models.Message.is_read == False
         ).update({"is_read": True, "read_at": datetime.utcnow()})
-        
+
+        # Mark all DB notifications as read
+        db.query(models.Notification).filter(
+            models.Notification.user_id == current_user.id,
+            models.Notification.is_read == False
+        ).update({"is_read": True})
+
         db.commit()
-        
+
         return {"message": "All notifications marked as read"}
+
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to mark all notifications as read")

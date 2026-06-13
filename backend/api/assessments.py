@@ -1,6 +1,6 @@
 # backend/api/assessments.py
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, File, Form, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
@@ -119,11 +119,210 @@ def recalculate_user_scores(user_id: int, db: Session) -> tuple:
 
 
 # ============================================================================
+# EXPO PUSH NOTIFICATION HELPER
+# ============================================================================
+
+import urllib.request
+import json as _json
+
+def _send_expo_push(push_token: str, title: str, body: str, data: dict = None):
+    """
+    Send a push notification via the Expo Push API.
+    Requires no external libraries — uses stdlib urllib.
+    """
+    if not push_token or not push_token.startswith("ExponentPushToken"):
+        return  # Not a valid Expo token, skip silently
+
+    payload = _json.dumps({
+        "to": push_token,
+        "title": title,
+        "body": body,
+        "data": data or {},
+        "sound": "default",
+        "priority": "high",
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://exp.host/--/api/v2/push/send",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = _json.loads(resp.read().decode("utf-8"))
+            print(f"[PUSH] Expo response: {result}")
+    except Exception as push_err:
+        print(f"[PUSH] Failed to send push notification: {push_err}")
+
+
+# ============================================================================
+# BACKGROUND TASK: Run AI analysis after upload returns
+# ============================================================================
+
+def _run_analysis_background(
+    assessment_id: int,
+    file_path_str: str,
+    test_type: str,
+    user_id: int,
+    athlete_weight: float,
+    athlete_height: float,
+):
+    """
+    Runs entirely in the background after the HTTP response has been sent.
+    Uses its own DB session so the request-scoped session is already closed.
+    """
+    from database import SessionLocal  # import here to avoid circular issues
+    db = SessionLocal()
+    try:
+        file_path = Path(file_path_str)
+
+        ai_score = 0.0
+        feedback = "Analysis could not be completed."
+        analysis_result = {}
+        success = False
+
+        try:
+            if test_type == "squats":
+                analyzer = SquatAnalyzer()
+                result = analyzer.analyze_video(file_path_str)
+                if result.get("success"):
+                    ai_score = result["ai_score"]
+                    feedback = result.get("feedback", "")
+                    analysis_result = result
+                    success = True
+                else:
+                    feedback = f"{EMOJI['no_entry']} Squat analysis failed: {result.get('error', 'Unknown error')}"
+
+            elif test_type == "shuttle_run":
+                shuttle = ShuttleRunAnalyzer()
+                result = shuttle.analyze_video(file_path_str)
+                if result.get("success"):
+                    ai_score = result["ai_score"]
+                    feedback = result.get("feedback", "")
+                    analysis_result = result
+                    success = True
+                else:
+                    feedback = f"{EMOJI['no_entry']} Shuttle-run analysis failed: {result.get('error')}"
+
+            elif test_type == "vertical_jump":
+                vja = VerticalJumpAnalyzer()
+                result = vja.analyze_video(
+                    file_path_str,
+                    weight_kg=athlete_weight,
+                    height_cm=athlete_height,
+                )
+                if result.get("success"):
+                    ai_score = result["ai_score"]
+                    feedback = result.get("feedback", "")
+                    analysis_result = result
+                    success = True
+                else:
+                    feedback = f"{EMOJI['no_entry']} Vertical-jump analysis failed: {result.get('error')}"
+
+            elif test_type == "height_detection":
+                sua = SitUpAnalyzer()
+                result = sua.analyze_video(file_path_str)
+                if result.get("success"):
+                    ai_score = result["ai_score"]
+                    feedback = result.get("feedback", "")
+                    analysis_result = result
+                    success = True
+                else:
+                    feedback = f"{EMOJI['no_entry']} Sit-up analysis failed: {result.get('error', 'Unknown error')}"
+
+        except Exception as analysis_err:
+            traceback.print_exc()
+            feedback = f"{EMOJI['no_entry']} Analysis error: {str(analysis_err)}"
+            success = False
+
+        # Update assessment row
+        assessment = db.query(models.Assessment).filter(
+            models.Assessment.id == assessment_id
+        ).first()
+
+        if assessment:
+            assessment.ai_score = float(ai_score)
+            assessment.ai_feedback = feedback
+            assessment.status = "completed" if success else "failed"
+            db.commit()
+            db.refresh(assessment)
+
+        # Recalculate user scores
+        if success:
+            recalculate_user_scores(user_id, db)
+
+        # Determine test display name
+        test_display = {
+            "squats": "Squats",
+            "shuttle_run": "Shuttle Run",
+            "vertical_jump": "Vertical Jump",
+            "height_detection": "Sit Ups",
+        }.get(test_type, test_type.replace("_", " ").title())
+
+        # Create in-app notification
+        if success:
+            notif_title = f"{EMOJI['check']} {test_display} Assessment Complete"
+            notif_message = f"Your {test_display} score: {ai_score:.1f}%"
+            notif_type = "assessment_complete"
+        else:
+            notif_title = f"{EMOJI['no_entry']} {test_display} Assessment Failed"
+            notif_message = f"We couldn't analyze your {test_display} video. Please try again."
+            notif_type = "assessment_failed"
+
+        notification = models.Notification(
+            user_id=user_id,
+            type=notif_type,
+            title=notif_title,
+            message=notif_message,
+            reference_id=assessment_id,
+            is_read=False,
+        )
+        db.add(notification)
+        db.commit()
+
+        # Send OS-level push notification (like Instagram)
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if user and user.push_token:
+            _send_expo_push(
+                push_token=user.push_token,
+                title=notif_title,
+                body=notif_message,
+                data={"screen": "Assessment", "assessment_id": assessment_id},
+            )
+
+        print(f"[BG] Assessment {assessment_id} finished → status={'completed' if success else 'failed'}, score={ai_score}")
+
+
+    except Exception as e:
+        traceback.print_exc()
+        print(f"[BG] Fatal error in background analysis for assessment {assessment_id}: {e}")
+        # Try to mark assessment as failed
+        try:
+            assessment = db.query(models.Assessment).filter(
+                models.Assessment.id == assessment_id
+            ).first()
+            if assessment and assessment.status == "processing":
+                assessment.status = "failed"
+                assessment.ai_feedback = "Analysis failed due to a server error."
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+# ============================================================================
 # ENDPOINTS
 # ============================================================================
 
 @router.post("/upload")
 async def upload_assessment(
+    background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
     test_type: str = Form(...),
     score: Optional[float] = Form(None),
@@ -133,10 +332,10 @@ async def upload_assessment(
     try:
         # Validation
         allowed_types = {
-            "video/mp4", 
-            "video/quicktime", 
-            "video/x-msvideo", 
-            "video/webm", 
+            "video/mp4",
+            "video/quicktime",
+            "video/x-msvideo",
+            "video/webm",
             "application/octet-stream"
         }
         if video.content_type not in allowed_types:
@@ -157,116 +356,47 @@ async def upload_assessment(
         with open(file_path, "wb") as f:
             shutil.copyfileobj(video.file, f)
 
-        # Analyze based on test type
-        ai_score, feedback, analysis_result = 0, "Analysis pending.", {}
-
-        if test_type == "squats":
-            analyzer = SquatAnalyzer()
-            result = analyzer.analyze_video(str(file_path))
-            if result.get("success"):
-                ai_score = result["ai_score"]
-                feedback = result.get("feedback", "")
-                analysis_result = result
-            else:
-                feedback = f"{EMOJI['no_entry']} Squat analysis failed: {result.get('error', 'Unknown error')}"
-                ai_score = 0
-                analysis_result = result
-
-        elif test_type == "shuttle_run":
-            shuttle = ShuttleRunAnalyzer()
-            result = shuttle.analyze_video(str(file_path))
-            if result.get("success"):
-                ai_score = result["ai_score"]
-                # The analyzer might return feedback with emojis, wrap it
-                raw_feedback = result.get("feedback", "")
-                feedback = raw_feedback  # Analyzer should use EMOJI constants too
-                analysis_result = result
-            else:
-                feedback = f"{EMOJI['no_entry']} Shuttle-run analysis failed: {result.get('error')}"
-                ai_score = 0
-
-        elif test_type == "vertical_jump":
-            vja = VerticalJumpAnalyzer()
-            # Extract athlete's weight and height from their profile for power calculation
-            athlete_weight = None
-            athlete_height = None
-            try:
-                if current_user.weight:
-                    athlete_weight = float(current_user.weight)
-                if current_user.height:
-                    athlete_height = float(current_user.height)
-            except (ValueError, TypeError):
-                pass  # weight/height not set or invalid — analyzer handles None gracefully
-
-            result = vja.analyze_video(
-                str(file_path),
-                weight_kg=athlete_weight,
-                height_cm=athlete_height,
-            )
-            if result.get("success"):
-                ai_score = result["ai_score"]
-                feedback = result.get("feedback", "")
-                analysis_result = result
-            else:
-                feedback = f"{EMOJI['no_entry']} Vertical-jump analysis failed: {result.get('error')}"
-                ai_score = 0
-
-        elif test_type == "height_detection":
-            sua = SitUpAnalyzer()
-            result = sua.analyze_video(str(file_path))
-            if result.get("success"):
-                ai_score = result["ai_score"]
-                feedback = result.get("feedback", "")
-                analysis_result = result
-            else:
-                feedback = f"{EMOJI['no_entry']} Sit-up analysis failed: {result.get('error', 'Unknown error')}"
-                ai_score = 0
-                analysis_result = result
-
-        # Save assessment to database
+        # Create assessment record immediately with status = "processing"
         assessment = models.Assessment(
             user_id=current_user.id,
             test_type=test_type,
             video_url=f"/uploads/assessments/{file_path.name}",
             score=score,
-            ai_score=float(ai_score),
-            ai_feedback=feedback,
-            status="completed",
+            ai_score=None,
+            ai_feedback=None,
+            status="processing",
         )
         db.add(assessment)
         db.commit()
         db.refresh(assessment)
 
-        # Recalculate user's AI score
-        new_ai_score, new_rank = recalculate_user_scores(current_user.id, db)
+        # Extract athlete physical stats for vertical jump
+        athlete_weight = None
+        athlete_height = None
+        try:
+            if current_user.weight:
+                athlete_weight = float(current_user.weight)
+            if current_user.height:
+                athlete_height = float(current_user.height)
+        except (ValueError, TypeError):
+            pass
 
-        # Get total athletes for context
-        total_athletes = db.query(models.User).filter(
-            models.User.role == 'athlete',
-            models.User.is_active == True,
-            models.User.ai_score.isnot(None),
-            models.User.ai_score > 0
-        ).count()
-
-        # Calculate percentile
-        percentile = None
-        if new_rank and total_athletes > 0:
-            percentile = round(((total_athletes - new_rank) / total_athletes) * 100, 1)
+        # Schedule the AI analysis to run in the background
+        background_tasks.add_task(
+            _run_analysis_background,
+            assessment_id=assessment.id,
+            file_path_str=str(file_path),
+            test_type=test_type,
+            user_id=current_user.id,
+            athlete_weight=athlete_weight,
+            athlete_height=athlete_height,
+        )
 
         return {
             "id": assessment.id,
             "test_type": test_type,
-            "ai_score": float(ai_score),
-            "feedback": feedback,
-            "details": analysis_result,
-            "status": "completed",
-            "user_stats": {
-                "ai_score": new_ai_score,
-                "this_assessment_score": float(ai_score),
-                "national_rank": new_rank,
-                "total_athletes": total_athletes,
-                "percentile": percentile
-            }
+            "status": "processing",
+            "message": "Video uploaded successfully. Analysis is running in the background.",
         }
 
     except HTTPException:
@@ -278,7 +408,8 @@ async def upload_assessment(
                 Path(file_path).unlink()
             except Exception:
                 pass
-        raise HTTPException(status_code=500, detail="Assessment processing failed")
+        raise HTTPException(status_code=500, detail="Assessment upload failed")
+
 
 @router.get("")
 async def get_assessments(

@@ -73,6 +73,7 @@ class User(Base):
     height = Column(String(50), nullable=True)
     weight = Column(String(50), nullable=True)
     skills = Column(Text, nullable=True)  # store as JSON string
+    push_token = Column(String(500), nullable=True)  # Expo push token for OS notifications
 
     # Stats
     national_rank = Column(Integer, nullable=True)
@@ -298,6 +299,33 @@ class Assessment(Base):
 
     # Relationship
     user = relationship("User", back_populates="assessments")
+
+
+# ============================================
+# NOTIFICATION MODEL
+# ============================================
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Type: "assessment_complete", "assessment_failed", etc.
+    type = Column(String(50), nullable=False)
+
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+
+    # Optional FK to the completed assessment
+    reference_id = Column(Integer, nullable=True)
+
+    is_read = Column(Boolean, default=False)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationship
+    user = relationship("User", backref="db_notifications")
 
 
 # ============================================

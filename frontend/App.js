@@ -1,13 +1,13 @@
-﻿// frontend/App.js - COMPLETE REPLACEMENT
+// frontend/App.js - COMPLETE REPLACEMENT
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { getUnreadCount } from './services/api';
 
 // Import your screens
@@ -29,6 +29,7 @@ import NotificationsScreen from './screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
 
 // ============================================
 // OWN PROFILE SCREEN - NEVER RECEIVES userId PARAM
@@ -218,6 +219,7 @@ function CoachTabNavigator() {
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Login');
+  const navigationRef = useRef(null);
 
   useEffect(() => {
     checkAuthStatus();
@@ -284,7 +286,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           initialRouteName={initialRoute}
           screenOptions={{

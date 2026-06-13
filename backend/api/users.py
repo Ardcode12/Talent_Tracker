@@ -396,10 +396,38 @@ async def update_profile(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+# ============================================================================
+# PUSH TOKEN REGISTRATION
+# ============================================================================
+
+@router.post("/push-token")
+async def register_push_token(
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Register or update the Expo push notification token for the current user."""
+    try:
+        body = await request.json()
+        token = body.get("token", "").strip()
+
+        if not token:
+            raise HTTPException(status_code=400, detail="Push token is required")
+
+        current_user.push_token = token
+        db.commit()
+
+        return {"message": "Push token registered successfully"}
+    except HTTPException:
+        raise
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to register push token")
+
+
 # Add this endpoint to backend/api/users.py
 
 # backend/api/users.py - Add these imports at the top
-
 
 # Replace the get_user_by_id endpoint with this complete version:
 @router.get("/{user_id}")

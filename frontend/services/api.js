@@ -14,7 +14,7 @@ const getApiUrl = () => {
     // To find your IP on Windows: run 'ipconfig' in cmd
     // Look for IPv4 Address under your active network adapter
 
-    return 'http://10.88.201.35:8000'; // UPDATE THIS WITH YOUR IP
+    return 'http://10.84.174.35:8000'; // UPDATE THIS WITH YOUR IP
   }
 };
 
@@ -947,9 +947,9 @@ class ApiService {
         throw new Error('Authentication required');
       }
 
-      // Long timeout for video analysis (5 minutes)
+      // Short timeout — backend now returns immediately (upload only, not analysis)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+      const timeoutId = setTimeout(() => controller.abort(), 60 * 1000); // 60s for upload
 
       const response = await fetch(`${API_BASE_URL}/assessments/upload`, {
         method: 'POST',
@@ -966,13 +966,29 @@ class ApiService {
       if (!response.ok) {
         throw new Error(data.detail || 'Upload failed');
       }
+      // Returns { id, status: "processing", message } immediately
       return data;
     } catch (error) {
       if (error.name === 'AbortError') {
-        throw new Error('Analysis timed out. Please try a shorter video (under 2 minutes).');
+        throw new Error('Upload timed out. Please check your connection and try again.');
       }
       console.error('Assessment upload error:', error);
       throw error;
+    }
+  }
+
+  static async getAssessmentStatus(assessmentId) {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return null;
+      const response = await fetch(`${API_BASE_URL}/assessments/${assessmentId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching assessment status:', error);
+      return null;
     }
   }
 
@@ -1603,6 +1619,14 @@ class ApiService {
     }
   }
 
+  static async markAllNotificationsRead() {
+    try {
+      return await this.makeAuthenticatedRequest('/notifications/mark-all-read', { method: 'POST' });
+    } catch (error) {
+      console.error('Mark all read error:', error);
+    }
+  }
+
   // ==========================================
   // CONNECTION METHODS
   // ==========================================
@@ -2025,6 +2049,7 @@ export const updateCoachProfile = ApiService.updateCoachProfile.bind(ApiService)
 export const uploadAssessment = ApiService.uploadAssessment.bind(ApiService);
 export const getAssessments = ApiService.getAssessments.bind(ApiService);
 export const getAssessmentStats = ApiService.getAssessmentStats.bind(ApiService);
+export const getAssessmentStatus = ApiService.getAssessmentStatus.bind(ApiService);
 
 // User Stats
 export const getUserStats = ApiService.getUserStats.bind(ApiService);
@@ -2056,6 +2081,8 @@ export const getSearchSuggestions = ApiService.getSearchSuggestions.bind(ApiServ
 // Notifications
 export const getNotifications = ApiService.getNotifications.bind(ApiService);
 export const getNotificationCount = ApiService.getNotificationCount.bind(ApiService);
+export const markAllNotificationsRead = ApiService.markAllNotificationsRead.bind(ApiService);
+
 // Add these exports at the bottom of api.js (with the other exports)
 
 export const deleteComment = ApiService.deleteComment.bind(ApiService);
