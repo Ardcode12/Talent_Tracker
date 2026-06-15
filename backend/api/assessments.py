@@ -10,7 +10,7 @@ from database import get_db
 import models, crud
 from datetime import datetime
 from pathlib import Path
-import random, shutil, traceback
+import hashlib, random, shutil, traceback
 
 # Analyzers
 from ml_models.squat.squat_analyzer import SquatAnalyzer

@@ -20,7 +20,7 @@ opencv-python==4.10.0.84
 tensorflow==2.21.0
 mediapipe==0.10.30
 joblib==1.4.2
-scipy>=1.17.0
+scipy>=1.13.0
 
 # --- Utilities ---
 python-dotenv==1.0.0

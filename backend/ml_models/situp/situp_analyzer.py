@@ -23,6 +23,7 @@ from typing import Dict, Any, Optional, List
 
 import mediapipe as mp
 import joblib
+import hashlib
 
 _DIR = Path(__file__).parent
 _TFLITE_PATH = _DIR / "situp_classifier.tflite"
@@ -74,8 +75,9 @@ _SCORE_TABLE = [
     (20, 40),
     (15, 30),
     (10, 20),
-    (5,  10),
-    (0,   0),
+    (5,  15),
+    (1,  10),    # minimum score for any genuine attempt
+    (0,   0),    # 0 only if no reps detected at all
 ]
 
 
@@ -93,6 +95,81 @@ def _band_from_reps(reps: int) -> tuple:
     if reps >= 20: return "Good",          "\U0001F44D"
     if reps >= 10: return "Average",       "\U0001F4CA"
     return             "Below Average",    "\U0001F4AA"
+
+
+# ============================================================================
+# ANTI-CHEAT CONSTANTS
+# ============================================================================
+
+# A single sit-up (down → up → down) physically takes at least this long
+MIN_SECONDS_PER_REP = 0.8
+# A human cannot sustain more than this many reps per second
+MAX_REPS_PER_SECOND = 1.2
+# Frames sampled per video segment for loop detection
+LOOP_DETECTION_SAMPLES = 10
+
+
+def _frame_signature(frame) -> np.ndarray:
+    """16x16 grayscale thumbnail as float32 — better pose discrimination than 8x8."""
+    small = cv2.resize(frame, (16, 16), interpolation=cv2.INTER_AREA)
+    return cv2.cvtColor(small, cv2.COLOR_BGR2GRAY).astype(np.float32)
+
+
+def _perceptual_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """Normalised cross-correlation similarity in [0,1]. Robust to brightness shifts."""
+    a_f = a.flatten() - a.mean()
+    b_f = b.flatten() - b.mean()
+    denom = np.linalg.norm(a_f) * np.linalg.norm(b_f)
+    if denom < 1e-6:
+        return 1.0
+    return float(np.dot(a_f, b_f) / denom)
+
+
+def _detect_video_loop(video_path: str) -> bool:
+    """
+    Layer 1 — Video Loop Detection.
+    Uses perceptual similarity (normalised cross-correlation) on 8x8 thumbnails.
+    Threshold: >= 0.65 average similarity between segments = looped video.
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return False
+
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total < 600:   # skip for videos under ~20s — too short for reliable loop detection
+        cap.release()
+        return False
+
+    third = total // 3
+    n = LOOP_DETECTION_SAMPLES
+
+    def sample_signatures(start: int, end: int) -> List[np.ndarray]:
+        sigs = []
+        indices = [start + (end - start) * i // n for i in range(n)]
+        for idx in indices:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ret, frame = cap.read()
+            if ret:
+                sigs.append(_frame_signature(frame))
+        return sigs
+
+    s1 = sample_signatures(0, third)
+    s2 = sample_signatures(third, 2 * third)
+    s3 = sample_signatures(2 * third, total)
+    cap.release()
+
+    def avg_similarity(a: List[np.ndarray], b: List[np.ndarray]) -> float:
+        if not a or not b:
+            return 0.0
+        return float(np.mean([_perceptual_similarity(x, y) for x, y in zip(a, b)]))
+
+    sim_12 = avg_similarity(s1, s2)
+    sim_13 = avg_similarity(s1, s3)
+    print(f"[AntiCheat-SitUp] Perceptual similarity — seg1↔seg2: {sim_12:.3f}, seg1↔seg3: {sim_13:.3f}")
+
+    # >= 0.92: near-identical = looped video. Genuine videos score 0.75-0.89.
+    return sim_12 >= 0.92 or sim_13 >= 0.92
+
 
 
 class SitUpAnalyzer:
@@ -204,6 +281,14 @@ class SitUpAnalyzer:
         try:
             print(f"\n=== Sit-Up Analysis: {video_path} ===")
 
+            # ── Layer 1: Video Loop Detection ─────────────────────────────
+            print("[AntiCheat-SitUp] Checking for looped/edited video...")
+            if _detect_video_loop(video_path):
+                return self._error(
+                    "Video manipulation detected: this video appears to be a looped "
+                    "or edited duplicate. Please upload an original, unedited recording."
+                )
+
             if not self._load_model():
                 return self._error(
                     "Sit-up model not loaded. Please train and upload the model files."
@@ -216,9 +301,10 @@ class SitUpAnalyzer:
             if not cap.isOpened():
                 return self._error("Could not open video file.")
 
-            fps         = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            fps          = cap.get(cv2.CAP_PROP_FPS) or 30.0
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            print(f"    Video: {total_frames} frames @ {fps:.0f} FPS")
+            video_duration_sec = total_frames / fps
+            print(f"    Video: {total_frames} frames @ {fps:.0f} FPS ({video_duration_sec:.1f}s)")
 
             if total_frames < 15:
                 cap.release()
@@ -288,13 +374,30 @@ class SitUpAnalyzer:
             # Smooth predictions with a 5-frame majority window to remove noise
             smoothed = self._smooth_predictions(valid_preds, window=5)
 
-            rep_count, rep_frames = self._count_reps(smoothed)
+            # ── Count reps (Layer 2: per-rep minimum time enforced inside) ───
+            rep_count, rep_frames, fraud_flags = self._count_reps(smoothed, fps=fps)
             print(f"    Reps detected: {rep_count}")
 
             if rep_count == 0:
                 return self._error(
                     "No complete sit-up reps detected. "
                     "Ensure you perform full reps (all the way up and all the way down)."
+                )
+
+            # ── Layer 3 & 4: Rep Rate Limiter + Hard Cap ──────────────────
+            max_possible_reps = int(video_duration_sec * MAX_REPS_PER_SECOND)
+
+            if rep_count > max_possible_reps:
+                fraud_flags.append(
+                    f"Rep count ({rep_count}) exceeds the physical maximum "
+                    f"({max_possible_reps}) possible in {video_duration_sec:.0f}s. "
+                    f"Possible video editing detected."
+                )
+
+            if fraud_flags:
+                print(f"[AntiCheat-SitUp] \u26a0\ufe0f Fraud flags: {fraud_flags}")
+                return self._error(
+                    "Anti-cheat check failed: " + " | ".join(fraud_flags)
                 )
 
             # ── Quality: check full range of motion ───────────────────────
@@ -340,30 +443,51 @@ class SitUpAnalyzer:
             smoothed.append(vote)
         return smoothed
 
-    def _count_reps(self, smoothed: List[int]):
+    def _count_reps(self, smoothed: List[int], fps: float = 30.0):
         """
         Count complete reps: DOWN → UP → DOWN = 1 rep.
-        Returns (rep_count, list of rep end frame indices).
+
+        Layer 2 — Per-Rep Minimum Time:
+          Each rep must span at least MIN_SECONDS_PER_REP seconds worth of frames.
+          Impossibly fast transitions (looped/sped-up video) are discarded.
+
+        Returns (rep_count, list of rep end frame indices, fraud_flags list).
         """
-        reps       = 0
-        rep_frames = []
-        state      = smoothed[0]  # starting state
-        phase      = "waiting"    # waiting, going_up, going_down
+        reps              = 0
+        rep_frames        = []
+        skipped_fast_reps = 0
+        fraud_flags: List[str] = []
+        phase             = "waiting"
+        rep_start         = None
+
+        min_frames_per_rep = int(MIN_SECONDS_PER_REP * fps)
 
         for i, pred in enumerate(smoothed):
             if phase == "waiting":
-                if pred == 0:     # in DOWN position
+                if pred == 0:           # in DOWN position
                     phase = "in_down"
+                    rep_start = i
             elif phase == "in_down":
-                if pred == 1:     # moved to UP
+                if pred == 1:           # moved to UP
                     phase = "in_up"
             elif phase == "in_up":
-                if pred == 0:     # came back DOWN = completed rep
-                    reps += 1
-                    rep_frames.append(i)
+                if pred == 0:           # came back DOWN = completed rep
+                    rep_duration = (i - rep_start) if rep_start is not None else min_frames_per_rep
+                    if rep_duration >= min_frames_per_rep:
+                        reps += 1
+                        rep_frames.append(i)
+                    else:
+                        skipped_fast_reps += 1
                     phase = "in_down"
+                    rep_start = i
 
-        return reps, rep_frames
+        if skipped_fast_reps > 0:
+            fraud_flags.append(
+                f"{skipped_fast_reps} rep(s) completed in under {MIN_SECONDS_PER_REP}s "
+                f"— physically impossible, possible video editing detected."
+            )
+
+        return reps, rep_frames, fraud_flags
 
     def _assess_quality(self, smoothed: List[int], rep_frames: List[int]) -> float:
         """

@@ -290,6 +290,7 @@ class Assessment(Base):
 
     test_type = Column(String(100))
     video_url = Column(String(500), nullable=True)
+    video_hash = Column(String(64), nullable=True, index=True)  # SHA-256 for duplicate detection
     score = Column(Float, nullable=True)
     ai_score = Column(Float, nullable=True)
     ai_feedback = Column(Text, nullable=True)

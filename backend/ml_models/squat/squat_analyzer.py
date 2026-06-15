@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 import mediapipe as mp
+import hashlib
 
 # Load model lazily to avoid import-time errors
 _model = None
@@ -43,8 +44,9 @@ _SCORE_TABLE = [
     (20, 40),
     (15, 30),
     (10, 20),
-    (5,  10),
-    (0,   0),
+    (5,  15),
+    (1,  10),  # minimum score for any genuine attempt
+    (0,   0),  # 0 only if zero valid reps detected
 ]
 
 
@@ -195,20 +197,122 @@ def _extract_frame_features(landmarks) -> Optional[List[float]]:
         return None
 
 
-def _count_reps(knee_angles: List[float]) -> Dict[str, Any]:
-    """Count squat reps from knee angle time-series."""
+# ============================================================================
+# ANTI-CHEAT CONSTANTS
+# ============================================================================
+
+# A single squat (down + up) physically takes at least this many seconds
+MIN_SECONDS_PER_REP = 0.8
+# A human cannot do more than this many reps per second even at max speed
+MAX_REPS_PER_SECOND = 1.2
+# How many sample frames to compare for loop detection (per third of video)
+LOOP_DETECTION_SAMPLES = 10
+
+
+def _frame_signature(frame) -> np.ndarray:
+    """
+    Return a 16x16 grayscale thumbnail as float32.
+    Larger than 8x8 so we can distinguish different exercise positions.
+    """
+    small = cv2.resize(frame, (16, 16), interpolation=cv2.INTER_AREA)
+    return cv2.cvtColor(small, cv2.COLOR_BGR2GRAY).astype(np.float32)
+
+
+def _perceptual_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """
+    Normalised similarity in [0, 1].
+    1.0 = identical frames, 0.0 = completely different.
+    Uses normalised cross-correlation — robust to slight brightness/contrast shifts.
+    """
+    a_f = a.flatten() - a.mean()
+    b_f = b.flatten() - b.mean()
+    denom = (np.linalg.norm(a_f) * np.linalg.norm(b_f))
+    if denom < 1e-6:
+        return 1.0  # both blank frames → treat as same
+    return float(np.dot(a_f, b_f) / denom)
+
+
+def _detect_video_loop(video_path: str) -> bool:
+    """
+    Layer 1 — Video Loop Detection.
+
+    Splits the video into thirds and samples LOOP_DETECTION_SAMPLES frames
+    from each third. Uses perceptual similarity (normalised cross-correlation)
+    so the check survives video re-encoding/compression from editing apps.
+
+    If segment-1 frames are >= 65% similar to segment-2 OR segment-3,
+    the video is flagged as a loop/edited duplicate.
+
+    Returns True if a loop is detected (fraud), False if genuine.
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return False
+
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total < 600:   # skip for videos under ~20s — too short for reliable loop detection
+        cap.release()
+        return False
+
+    third = total // 3
+    n = LOOP_DETECTION_SAMPLES
+
+    def sample_signatures(start: int, end: int) -> List[np.ndarray]:
+        sigs = []
+        indices = [start + (end - start) * i // n for i in range(n)]
+        for idx in indices:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ret, frame = cap.read()
+            if ret:
+                sigs.append(_frame_signature(frame))
+        return sigs
+
+    s1 = sample_signatures(0, third)
+    s2 = sample_signatures(third, 2 * third)
+    s3 = sample_signatures(2 * third, total)
+    cap.release()
+
+    def avg_similarity(a: List[np.ndarray], b: List[np.ndarray]) -> float:
+        if not a or not b:
+            return 0.0
+        scores = [_perceptual_similarity(x, y) for x, y in zip(a, b)]
+        return float(np.mean(scores))
+
+    sim_12 = avg_similarity(s1, s2)
+    sim_13 = avg_similarity(s1, s3)
+    print(f"[AntiCheat-Squat] Perceptual similarity — seg1↔seg2: {sim_12:.3f}, seg1↔seg3: {sim_13:.3f}")
+
+    # >= 0.92: frames are near-identical = looped/repeated video
+    # Genuine exercise videos score 0.75-0.89 (same room/person but different poses)
+    return sim_12 >= 0.92 or sim_13 >= 0.92
+
+
+def _count_reps(knee_angles: List[float], fps: float = 30.0) -> Dict[str, Any]:
+    """
+    Count squat reps from knee angle time-series.
+
+    Layer 2 — Per-Rep Minimum Time:
+      Each rep must take at least MIN_SECONDS_PER_REP seconds.
+      Impossibly fast reps (from looped/sped-up video) are discarded
+      and recorded in fraud_flags.
+    """
     if len(knee_angles) < 10:
-        return {"count": 0, "partial": 0, "rep_times": []}
+        return {"count": 0, "partial": 0, "rep_times": [], "fraud_flags": []}
 
     valid_reps = 0
     partial_reps = 0
-    
-    DEEP_THRESHOLD = 115   # below this = good deep squat
-    PARTIAL_THRESHOLD = 140 # below this but above 115 = shallow/partial squat
-    STAND_THRESHOLD = 160  # above this = standing straight
+    skipped_fast_reps = 0
+    fraud_flags: List[str] = []
+
+    DEEP_THRESHOLD    = 115   # below this = good deep squat
+    PARTIAL_THRESHOLD = 140   # below this but above 115 = shallow/partial
+    STAND_THRESHOLD   = 160   # above this = standing straight
+
+    # Layer 2: minimum frames that one rep must span
+    min_frames_per_rep = int(MIN_SECONDS_PER_REP * fps)
 
     # States: 0=standing, 1=partial squat, 2=deep squat
-    state = 0 
+    state     = 0
     rep_start = None
     rep_times = []
 
@@ -220,7 +324,7 @@ def _count_reps(knee_angles: List[float]) -> Dict[str, Any]:
             elif angle < PARTIAL_THRESHOLD:
                 state = 1
                 rep_start = i
-                
+
         elif state == 1:
             if angle < DEEP_THRESHOLD:
                 state = 2  # upgraded to deep squat
@@ -228,19 +332,31 @@ def _count_reps(knee_angles: List[float]) -> Dict[str, Any]:
                 partial_reps += 1
                 state = 0
                 rep_start = None
-                
+
         elif state == 2:
             if angle > STAND_THRESHOLD:
-                valid_reps += 1
-                if rep_start is not None:
-                    rep_times.append(i - rep_start)
+                rep_duration = (i - rep_start) if rep_start is not None else min_frames_per_rep
+                if rep_duration >= min_frames_per_rep:
+                    # Rep took a physically plausible amount of time — count it
+                    valid_reps += 1
+                    rep_times.append(rep_duration)
+                else:
+                    # Rep was impossibly fast — discard it
+                    skipped_fast_reps += 1
                 state = 0
                 rep_start = None
+
+    if skipped_fast_reps > 0:
+        fraud_flags.append(
+            f"{skipped_fast_reps} rep(s) completed in under {MIN_SECONDS_PER_REP}s "
+            f"— physically impossible, possible video editing detected."
+        )
 
     return {
         "count": valid_reps,
         "partial": partial_reps,
-        "rep_times": rep_times
+        "rep_times": rep_times,
+        "fraud_flags": fraud_flags,
     }
 
 
@@ -336,13 +452,22 @@ class SquatAnalyzer:
         try:
             print(f"\n=== Squat Analysis (Trained Model): {video_path} ===")
 
+            # ── Layer 1: Video Loop Detection ─────────────────────────────────
+            print("[AntiCheat-Squat] Checking for looped/edited video...")
+            if _detect_video_loop(video_path):
+                return self._error(
+                    "Video manipulation detected: this video appears to be a looped "
+                    "or edited duplicate. Please upload an original, unedited recording."
+                )
+
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
                 return self._error("Could not open video file")
 
             fps = cap.get(cv2.CAP_PROP_FPS) or 30
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            print(f"Video: {total_frames} frames @ {fps:.0f} FPS")
+            video_duration_sec = total_frames / fps
+            print(f"Video: {total_frames} frames @ {fps:.0f} FPS ({video_duration_sec:.1f}s)")
 
             if total_frames < 15:
                 cap.release()
@@ -431,8 +556,8 @@ class SquatAnalyzer:
                     "This is not a squat video. Please upload a valid squat video."
                 )
 
-            # ---- Count reps from knee angles ----
-            rep_info = _count_reps(avg_knee_angles.tolist())
+            # ---- Count reps from knee angles (with Layer 2 per-rep time check) ----
+            rep_info = _count_reps(avg_knee_angles.tolist(), fps=fps)
 
             # ---- Classify each frame ----
             if _scaler is not None:
@@ -450,8 +575,29 @@ class SquatAnalyzer:
             overall_class = int(unique[np.argmax(counts)])
             class_confidence = float(counts[np.argmax(counts)] / len(frame_classes) * 100)
 
-            # ---- Rep-count based scoring (same system as sit-ups) ----
-            reps = rep_info["count"]
+            # ── Layer 3 & 4: Rep Rate Limiter + Hard Cap ─────────────────────
+            raw_reps    = rep_info["count"]
+            fraud_flags = rep_info.get("fraud_flags", [])
+
+            # Layer 4: Hard cap — max physically possible reps for this video length
+            max_possible_reps = int(video_duration_sec * MAX_REPS_PER_SECOND)
+
+            # Layer 3: Rate limiter — also triggers the fraud flag
+            if raw_reps > max_possible_reps:
+                fraud_flags.append(
+                    f"Rep count ({raw_reps}) exceeds the physical maximum "
+                    f"({max_possible_reps}) possible in {video_duration_sec:.0f}s. "
+                    f"Possible video editing detected."
+                )
+
+            if fraud_flags:
+                print(f"[AntiCheat-Squat] \u26a0\ufe0f Fraud flags detected: {fraud_flags}")
+                return self._error(
+                    "Anti-cheat check failed: " + " | ".join(fraud_flags)
+                )
+
+            # ---- Rep-count based scoring ----
+            reps    = raw_reps
             partial = rep_info["partial"]
 
             base_score = _score_from_reps(reps)
