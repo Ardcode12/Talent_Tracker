@@ -1017,6 +1017,7 @@ export default function HomeScreen({ navigation }) {
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}
         navigation={navigation}
+        onCountChange={(count) => setNotificationCount(count)}
       />
 
       {/* Post Options Modal */}

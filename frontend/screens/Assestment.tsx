@@ -45,6 +45,7 @@ const fixEmojiEncoding = (text: string | null | undefined): string => {
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const STAT_CIRCLE_SIZE = (SCREEN_WIDTH - Theme.spacing.lg * 2 - Theme.spacing.md * 2) / 3;
 
 const ASSESSMENT_TESTS = [
   { 
@@ -338,9 +339,10 @@ export default function AssessmentScreen() {
       // Reload list to show the new "processing" card
       await loadData();
 
-    } catch (error) {
+    } catch (error: any) {
       setIsUploading(false);
-      Alert.alert('Upload Failed', 'Could not upload the video. Please check your connection and try again.');
+      const errorMessage = error.response?.data?.detail || error.message || 'Could not upload the video. Please check your connection and try again.';
+      Alert.alert('Upload Failed', errorMessage);
       console.error('Upload error:', error);
     }
   };
@@ -351,22 +353,35 @@ export default function AssessmentScreen() {
     <Text style={styles.headerSubtitle}>Track Your Athletic Performance</Text>
     {stats ? (
       <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.total_assessments || 0}</Text>
+        <View style={styles.statCardWrapper}>
+          <LinearGradient colors={['rgba(30,136,229,0.25)', 'rgba(21,101,192,0.08)']} style={styles.statCard}>
+            <View style={[styles.statIconCircle, { backgroundColor: 'rgba(30,136,229,0.3)' }]}>
+              <Ionicons name="clipboard-outline" size={18} color="#1E88E5" />
+            </View>
+            <Text style={[styles.statValue, { color: '#60A5FA' }]}>{stats.total_assessments || 0}</Text>
+          </LinearGradient>
           <Text style={styles.statLabel}>Total Tests</Text>
         </View>
-        <View style={styles.statCard}>
-          {/* Average of ALL scores - for Assessment page */}
-          <Text style={styles.statValue}>
-            {stats.average_score ? `${stats.average_score.toFixed(1)}%` : 'N/A'}
-          </Text>
+        <View style={styles.statCardWrapper}>
+          <LinearGradient colors={['rgba(94,53,177,0.25)', 'rgba(69,39,160,0.08)']} style={styles.statCard}>
+            <View style={[styles.statIconCircle, { backgroundColor: 'rgba(94,53,177,0.3)' }]}>
+              <Ionicons name="analytics-outline" size={18} color="#5E35B1" />
+            </View>
+            <Text style={[styles.statValue, { color: '#A78BFA' }]}>
+              {stats.average_score ? `${stats.average_score.toFixed(1)}%` : 'N/A'}
+            </Text>
+          </LinearGradient>
           <Text style={styles.statLabel}>Avg Score</Text>
         </View>
-        <View style={styles.statCard}>
-          {/* Average of BEST scores - used for ranking */}
-          <Text style={styles.statValue}>
-            {stats.current_ai_score ? `${stats.current_ai_score.toFixed(1)}%` : 'N/A'}
-          </Text>
+        <View style={styles.statCardWrapper}>
+          <LinearGradient colors={['rgba(255,179,0,0.25)', 'rgba(255,160,0,0.08)']} style={styles.statCard}>
+            <View style={[styles.statIconCircle, { backgroundColor: 'rgba(255,179,0,0.3)' }]}>
+              <Ionicons name="trophy-outline" size={18} color="#FFB300" />
+            </View>
+            <Text style={[styles.statValue, { color: '#FCD34D' }]}>
+              {stats.current_ai_score ? `${stats.current_ai_score.toFixed(1)}%` : 'N/A'}
+            </Text>
+          </LinearGradient>
           <Text style={styles.statLabel}>Rank Score</Text>
         </View>
       </View>
@@ -728,7 +743,15 @@ export default function AssessmentScreen() {
                   <>
                     {selectedTest?.instructions && (
                       <View style={styles.instructionsContainer}>
+                        <View style={styles.faceWarningBox}>
+                          <Ionicons name="scan-outline" size={24} color="#60A5FA" />
+                          <View style={styles.faceWarningTextCol}>
+                            <Text style={styles.faceWarningTitle}>Face Verification Active</Text>
+                            <Text style={styles.faceWarningDesc}>We will automatically verify your identity. Ensure your face is clearly visible at some point during the video.</Text>
+                          </View>
+                        </View>
                         <Text style={styles.instructionsTitle}>Instructions:</Text>
+
                         {selectedTest.instructions.map((inst: string, index: number) => (
                           <Text key={index} style={styles.instructionText}>
                             • {renderInstructionText(inst)}
@@ -780,6 +803,11 @@ export default function AssessmentScreen() {
         <View style={styles.cameraContainer}>
           {cameraPermission?.granted && microphonePermission?.granted ? (
             <CameraView ref={cameraRef} style={styles.camera} facing="back" mode="video">
+              {isRecording && (
+                <View style={styles.recordingOverlay}>
+                  <Text style={styles.recordingOverlayText}>Face Verification Active</Text>
+                </View>
+              )}
               <View style={styles.cameraControls}>
                 <TouchableOpacity onPress={() => setShowCameraModal(false)}>
                   <Ionicons name="close" size={30} color="#fff" />
@@ -820,13 +848,35 @@ export default function AssessmentScreen() {
 // --- Styles (unchanged) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Theme.colors.background },
-  header: { padding: Theme.spacing.xl, paddingTop: Platform.OS === 'ios' ? 60 : 40, backgroundColor: Theme.colors.elevated },
-  headerTitle: { fontSize: 32, fontWeight: '900', color: Theme.colors.text, marginBottom: 8 },
-  headerSubtitle: { fontSize: 16, color: Theme.colors.textSecondary, marginBottom: Theme.spacing.lg },
-  statsContainer: { flexDirection: 'row', gap: Theme.spacing.md },
-  statCard: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: Theme.spacing.md, borderRadius: Theme.borderRadius.lg, alignItems: 'center' },
-  statValue: { fontSize: 24, fontWeight: '800', color: Theme.colors.primary },
-  statLabel: { fontSize: 12, color: Theme.colors.textSecondary, marginTop: 4 },
+  header: { padding: Theme.spacing.lg, paddingTop: Platform.OS === 'ios' ? 50 : 30, backgroundColor: Theme.colors.background },
+  headerTitle: { fontSize: 28, fontWeight: '900', color: Theme.colors.text, marginBottom: 4 },
+  headerSubtitle: { fontSize: 14, color: Theme.colors.textSecondary, marginBottom: Theme.spacing.md },
+  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: Theme.spacing.sm, marginTop: 0 },
+  statCardWrapper: { alignItems: 'center', width: STAT_CIRCLE_SIZE },
+  statCard: {
+    width: STAT_CIRCLE_SIZE,
+    height: STAT_CIRCLE_SIZE,
+    borderRadius: STAT_CIRCLE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  statIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  statValue: { fontSize: 16, fontWeight: '900', letterSpacing: -0.5 },
+  statLabel: { fontSize: 10, color: Theme.colors.textSecondary, marginTop: 6, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
   section: { padding: Theme.spacing.lg },
   sectionTitle: { fontSize: 20, fontWeight: '700', color: Theme.colors.text, marginBottom: Theme.spacing.lg },
   testGrid: { justifyContent: 'space-between' },
@@ -859,6 +909,11 @@ notAuthenticatedText: {
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Theme.spacing.xl },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Theme.colors.text },
   instructionsContainer: { backgroundColor: 'rgba(255,255,255,0.05)', padding: 15, borderRadius: 10, marginBottom: 20 },
+  faceWarningBox: { flexDirection: 'row', backgroundColor: 'rgba(96, 165, 250, 0.1)', padding: 12, borderRadius: 8, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(96, 165, 250, 0.2)' },
+  faceWarningTextCol: { flex: 1, marginLeft: 12 },
+  faceWarningTitle: { color: '#60A5FA', fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  faceWarningDesc: { color: '#BFDBFE', fontSize: 12, lineHeight: 16 },
+
   instructionsTitle: { color: Theme.colors.primary, fontSize: 16, fontWeight: 'bold', marginBottom: 8 },
   instructionText: { color: '#ccc', fontSize: 14, marginBottom: 4, lineHeight: 20 },
   nextButton: { backgroundColor: Theme.colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, borderRadius: Theme.borderRadius.md, marginTop: 10, gap: 8 },
@@ -995,6 +1050,9 @@ notAuthenticatedText: {
   recordingButton: { backgroundColor: 'rgba(255,0,0,0.3)' },
   recordButtonInner: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#ff0000' },
   recordingText: { color: '#fff', fontSize: 16 },
+  recordingOverlay: { position: 'absolute', top: '15%', left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+  recordingOverlayText: { backgroundColor: 'rgba(239, 68, 68, 0.9)', color: '#fff', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, fontSize: 18, fontWeight: 'bold', overflow: 'hidden' },
+
   noPermission: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   noPermissionText: { color: '#fff', fontSize: 16 },
 

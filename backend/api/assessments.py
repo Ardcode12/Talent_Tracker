@@ -12,11 +12,11 @@ from datetime import datetime
 from pathlib import Path
 import hashlib, random, shutil, traceback
 
-# Analyzers
 from ml_models.squat.squat_analyzer import SquatAnalyzer
 from ml_models.shuttle_run.shuttle_run_analyzer import ShuttleRunAnalyzer
 from ml_models.vertical_jump_analyzer import VerticalJumpAnalyzer
 from ml_models.situp.situp_analyzer import SitUpAnalyzer
+from ml_models.face_verifier import verify_face_in_video
 
 router = APIRouter(prefix="/api/assessments", tags=["assessments"])
 
@@ -171,6 +171,7 @@ def _run_analysis_background(
     user_id: int,
     athlete_weight: float,
     athlete_height: float,
+    profile_photo_path: str = None,
 ):
     """
     Runs entirely in the background after the HTTP response has been sent.
@@ -185,6 +186,27 @@ def _run_analysis_background(
         feedback = "Analysis could not be completed."
         analysis_result = {}
         success = False
+
+        # --- Anti-cheat: Face Verification (runs in background, shows in result) ---
+        if profile_photo_path:
+            print(f"[BG] Running face verification for assessment {assessment_id}...")
+            try:
+                face_result = verify_face_in_video(file_path_str, profile_photo_path)
+                print(f"[BG] Face verification: {face_result}")
+                if face_result["verified"] is False:
+                    # Show as a failed assessment in history (same as loop detection)
+                    reason = face_result["reason"]
+                    assessment = db.query(models.Assessment).filter(
+                        models.Assessment.id == assessment_id
+                    ).first()
+                    if assessment:
+                        assessment.ai_score = 0.0
+                        assessment.ai_feedback = f"\U0001f6ab Face Verification Failed\n\n{reason}\n\nPlease upload a video where your face is clearly visible and matches your profile photo."
+                        assessment.status = "failed"
+                        db.commit()
+                    return  # Don't run exercise analysis
+            except Exception as fe:
+                print(f"[BG] Face verification error (skipping): {fe}")
 
         try:
             if test_type == "squats":
@@ -353,8 +375,21 @@ async def upload_assessment(
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_name = "".join(c for c in video.filename if c.isalnum() or c in "._-") or "video.mp4"
         file_path = dst_dir / f"{ts}_{test_type}_{safe_name}"
+        # Save the video file
         with open(file_path, "wb") as f:
             shutil.copyfileobj(video.file, f)
+
+        # Resolve profile photo path (passed to background task for face check)
+        profile_photo_path = None
+        profile_photo_url = current_user.profile_photo or current_user.profile_image
+        if profile_photo_url:
+            photo_filename = profile_photo_url.split('/')[-1]
+            if (UPLOAD_DIR / photo_filename).exists():
+                profile_photo_path = str(UPLOAD_DIR / photo_filename)
+            elif (UPLOAD_DIR / "profiles" / photo_filename).exists():
+                profile_photo_path = str(UPLOAD_DIR / "profiles" / photo_filename)
+        if not profile_photo_path:
+            print("[UPLOAD] No profile photo found — face verification will be skipped.")
 
         # Create assessment record immediately with status = "processing"
         assessment = models.Assessment(
@@ -390,6 +425,7 @@ async def upload_assessment(
             user_id=current_user.id,
             athlete_weight=athlete_weight,
             athlete_height=athlete_height,
+            profile_photo_path=profile_photo_path,
         )
 
         return {
