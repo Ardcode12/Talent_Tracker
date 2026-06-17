@@ -49,6 +49,7 @@ import {
 } from '../services/api';
 import ApiService from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
@@ -91,6 +92,7 @@ interface UserStats {
 }
 
 export default function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { scrollY, handleScroll, createScrollAnimation } = useScrollAnimations();
   
   // State
@@ -308,7 +310,7 @@ export default function HomeScreen({ navigation }) {
   // RENDER: TOP NAVIGATION
   // ==========================================
   const renderTopNavigation = () => (
-    <View style={styles.navigationBar}>
+    <View style={[styles.navigationBar, { paddingTop: insets.top + 8 }]}>
       <View style={styles.navContent}>
         <Text style={styles.appName}>TalentTracker</Text>
         
@@ -985,7 +987,6 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.background,
   },
   navigationBar: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: Theme.spacing.md,
     paddingHorizontal: Theme.spacing.md,
     backgroundColor: 'rgba(20, 27, 45, 0.98)',

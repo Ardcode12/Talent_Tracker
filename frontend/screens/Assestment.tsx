@@ -19,6 +19,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -53,9 +54,10 @@ const ASSESSMENT_TESTS = [
     id: 'shuttle_run',
     name: 'Shuttle Run', 
     icon: 'directions-run', 
-    color: '#FF6B6B', 
+    accentColor: Theme.colors.primary,
     unit: 'seconds', 
-    description: 'Test your agility and speed',
+    description: 'Agility & Speed',
+    tag: 'Cardio',
     instructions: [
       'Record from a **straight angle** covering the entire **10m track**.',
       'A **10-meter** running distance is **compulsory**.',
@@ -64,12 +66,13 @@ const ASSESSMENT_TESTS = [
     ]
   },
   { 
-    id: 'vertical_jump', // ✅ Changed from vertical_jump
+    id: 'vertical_jump',
     name: 'Vertical Jump', 
     icon: 'trending-up', 
-    color: '#4ECDC4', 
+    accentColor: Theme.colors.secondary,
     unit: 'cm', 
-    description: 'Measure explosive power',
+    description: 'Explosive Power',
+    tag: 'Strength',
     instructions: [
       'Record from a **side-on angle**.',
       'Ensure your **full body (head to feet)** is visible throughout the jump.',
@@ -81,9 +84,10 @@ const ASSESSMENT_TESTS = [
     id: 'squats',
     name: 'Squats', 
     icon: 'fitness-center', 
-    color: '#45B7D1', 
+    accentColor: Theme.colors.accent,
     unit: 'reps', 
-    description: 'Test lower body strength',
+    description: 'Lower Body Strength',
+    tag: 'Endurance',
     instructions: [
       'Record from a **side-on angle**.',
       'Perform as many **continuous reps** as possible.',
@@ -95,9 +99,10 @@ const ASSESSMENT_TESTS = [
     id: 'height_detection',
     name: 'Sit Ups', 
     icon: 'self-improvement', 
-    color: '#F7DC6F', 
-    unit: 'cm', 
-    description: 'Test Core Strength',
+    accentColor: '#8B5CF6',
+    unit: 'reps', 
+    description: 'Core Strength',
+    tag: 'Core',
     instructions: [
       'Record from a **side-on angle**.',
       'Ensure your **full body is visible**.',
@@ -121,6 +126,7 @@ const renderInstructionText = (text: string) => {
 };
 
 export default function AssessmentScreen() {
+  const insets = useSafeAreaInsets();
   const [selectedTest, setSelectedTest] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [modalStep, setModalStep] = useState(1);
@@ -349,7 +355,7 @@ export default function AssessmentScreen() {
   };
 
   const renderHeader = () => (
-  <View style={styles.header}>
+  <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
     <Text style={styles.headerTitle}>AI Assessments</Text>
     <Text style={styles.headerSubtitle}>Track Your Athletic Performance</Text>
     {stats ? (
@@ -397,12 +403,26 @@ export default function AssessmentScreen() {
         setModalStep(1);
         setShowUploadModal(true); 
       }}
+      activeOpacity={0.85}
     >
-      <LinearGradient colors={[item.color, item.color + 'CC']} style={styles.testGradient}>
-        <MaterialIcons name={item.icon} size={40} color="#fff" />
+      <View style={styles.testCardInner}>
+        {/* Accent bar */}
+        <View style={[styles.testCardAccent, { backgroundColor: item.accentColor }]} />
+        {/* Icon circle */}
+        <View style={[styles.testCardIconCircle, { backgroundColor: item.accentColor + '20' }]}>
+          <MaterialIcons name={item.icon} size={28} color={item.accentColor} />
+        </View>
+        {/* Tag */}
+        <View style={[styles.testCardTag, { backgroundColor: item.accentColor + '18' }]}>
+          <Text style={[styles.testCardTagText, { color: item.accentColor }]}>{item.tag}</Text>
+        </View>
         <Text style={styles.testName}>{item.name}</Text>
         <Text style={styles.testDescription}>{item.description}</Text>
-      </LinearGradient>
+        {/* Arrow */}
+        <View style={styles.testCardArrow}>
+          <MaterialIcons name="arrow-forward" size={16} color={item.accentColor} />
+        </View>
+      </View>
     </TouchableOpacity>
   );
 
@@ -849,7 +869,11 @@ export default function AssessmentScreen() {
 // --- Styles (unchanged) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Theme.colors.background },
-  header: { padding: Theme.spacing.lg, paddingTop: Platform.OS === 'ios' ? 50 : 30, backgroundColor: Theme.colors.background },
+  header: {
+    padding: Theme.spacing.lg,
+    backgroundColor: Theme.colors.background,
+    // paddingTop is set dynamically using insets in the component
+  },
   headerTitle: { fontSize: 28, fontWeight: '900', color: Theme.colors.text, marginBottom: 4 },
   headerSubtitle: { fontSize: 14, color: Theme.colors.textSecondary, marginBottom: Theme.spacing.md },
   statsContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: Theme.spacing.sm, marginTop: 0 },
@@ -881,10 +905,59 @@ const styles = StyleSheet.create({
   section: { padding: Theme.spacing.lg },
   sectionTitle: { fontSize: 20, fontWeight: '700', color: Theme.colors.text, marginBottom: Theme.spacing.lg },
   testGrid: { justifyContent: 'space-between' },
-  testCard: { width: (SCREEN_WIDTH - Theme.spacing.lg * 3) / 2, marginBottom: Theme.spacing.md },
+  testCard: {
+    width: (SCREEN_WIDTH - Theme.spacing.lg * 3) / 2,
+    marginBottom: Theme.spacing.md,
+  },
+  testCardInner: {
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.lg,
+    padding: Theme.spacing.md,
+    height: 170,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  testCardAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: Theme.borderRadius.lg,
+    borderTopRightRadius: Theme.borderRadius.lg,
+  },
+  testCardIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Theme.spacing.sm,
+    marginBottom: Theme.spacing.sm,
+  },
+  testCardTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    marginBottom: 6,
+  },
+  testCardTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  testCardArrow: {
+    position: 'absolute',
+    bottom: Theme.spacing.sm,
+    right: Theme.spacing.sm,
+  },
   testGradient: { padding: Theme.spacing.lg, borderRadius: Theme.borderRadius.lg, alignItems: 'center', height: 160, justifyContent: 'center' },
-  testName: { fontSize: 16, fontWeight: '700', color: '#fff', marginTop: Theme.spacing.sm },
-  testDescription: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center', marginTop: 4 },
+  testName: { fontSize: 15, fontWeight: '800', color: Theme.colors.text, marginTop: 2 },
+  testDescription: { fontSize: 11, color: Theme.colors.textSecondary, marginTop: 3 },
   assessmentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Theme.spacing.md },
   assessmentTest: { fontSize: 16, fontWeight: '700', color: Theme.colors.text },
   assessmentDate: { fontSize: 13, color: Theme.colors.textSecondary },
