@@ -19,7 +19,7 @@ import Animated, {
   SlideInUp,
   ZoomIn,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
@@ -113,7 +113,7 @@ export const UltraAnimatedFeedPost: React.FC<Props> = ({ post, index }) => {
               <Image source={{ uri: post.userInfo.profilePhoto }} style={styles.avatar} />
               {post.postContent.aiVerified && (
                 <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#4ADE80" />
+                  <ProfessionalIcon name="checkmark-circle" size={16} color="#4ADE80" />
                 </View>
               )}
             </Animated.View>
@@ -131,7 +131,7 @@ export const UltraAnimatedFeedPost: React.FC<Props> = ({ post, index }) => {
           </View>
           
           <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+            <ProfessionalIcon name="ellipsis-vertical" size={20} color="#666" />
           </TouchableOpacity>
         </Animated.View>
 
@@ -149,7 +149,7 @@ export const UltraAnimatedFeedPost: React.FC<Props> = ({ post, index }) => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="shield-checkmark" size={14} color="#fff" />
+                <ProfessionalIcon name="shield-checkmark" size={14} color="#fff" />
                 <Text style={styles.aiVerifiedText}>AI Verified Performance</Text>
               </LinearGradient>
             </View>
@@ -160,7 +160,7 @@ export const UltraAnimatedFeedPost: React.FC<Props> = ({ post, index }) => {
               <Image source={{ uri: post.postContent.media }} style={styles.media} />
               <View style={styles.playOverlay}>
                 <View style={styles.playButton}>
-                  <Ionicons name="play" size={24} color="#fff" />
+                  <ProfessionalIcon name="play" size={24} color="#fff" />
                 </View>
               </View>
             </TouchableOpacity>
@@ -174,7 +174,7 @@ export const UltraAnimatedFeedPost: React.FC<Props> = ({ post, index }) => {
         >
           <TouchableOpacity onPress={handleLike} style={styles.engagementButton}>
             <Animated.View style={likeAnimatedStyle}>
-              <Ionicons 
+              <ProfessionalIcon 
                 name={liked ? "heart" : "heart-outline"} 
                 size={24} 
                 color={liked ? "#FF006E" : "#666"} 
@@ -186,17 +186,17 @@ export const UltraAnimatedFeedPost: React.FC<Props> = ({ post, index }) => {
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.engagementButton}>
-            <Ionicons name="chatbubble-outline" size={22} color="#666" />
+            <ProfessionalIcon name="chatbubble-outline" size={22} color="#666" />
             <Text style={styles.engagementText}>{post.engagement.comments}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.engagementButton}>
-            <Ionicons name="share-outline" size={22} color="#666" />
+            <ProfessionalIcon name="share-outline" size={22} color="#666" />
             <Text style={styles.engagementText}>{post.engagement.shares}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={[styles.engagementButton, styles.saveButton]}>
-            <Ionicons name="bookmark-outline" size={22} color="#666" />
+            <ProfessionalIcon name="bookmark-outline" size={22} color="#666" />
           </TouchableOpacity>
         </Animated.View>
       </BlurView>
@@ -205,7 +205,7 @@ export const UltraAnimatedFeedPost: React.FC<Props> = ({ post, index }) => {
       {showHeart && (
         <View style={styles.heartOverlay} pointerEvents="none">
           <Animated.View style={heartAnimatedStyle}>
-            <Ionicons name="heart" size={80} color="#FF006E" />
+            <ProfessionalIcon name="heart" size={80} color="#FF006E" />
           </Animated.View>
         </View>
       )}

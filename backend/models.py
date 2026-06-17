@@ -86,6 +86,11 @@ class User(Base):
     is_online = Column(Boolean, default=False)
     last_seen = Column(DateTime(timezone=True), nullable=True)
 
+    # Coach credential verification
+    coach_certificate = Column(String(500), nullable=True)   # uploaded file path
+    coach_verify_status = Column(String(50), default='pending')  # pending/approved/rejected
+    coach_verify_reason = Column(Text, nullable=True)            # rejection reason
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

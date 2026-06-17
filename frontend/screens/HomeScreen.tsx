@@ -20,7 +20,8 @@ import {
   Alert,
   Share,
 } from 'react-native';
-import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
 import { GlassmorphicCard } from '../components/GlassmorphicCard';
@@ -317,7 +318,7 @@ export default function HomeScreen({ navigation }) {
           onPress={() => setShowSearch(true)}
           activeOpacity={0.7}
         >
-          <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="search" size={20} color={Theme.colors.textSecondary} />
           <Text style={styles.searchPlaceholder}>Search</Text>
         </TouchableOpacity>
         
@@ -327,7 +328,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.iconButton}
             onPress={() => setShowNotifications(true)}
           >
-            <Ionicons name="notifications-outline" size={24} color={Theme.colors.text} />
+            <ProfessionalIcon name="notifications-outline" size={24} color={Theme.colors.text} />
             {notificationCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
@@ -342,7 +343,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.iconButton}
             onPress={() => navigation.navigate('Messages')}
           >
-            <Ionicons name="chatbubble-outline" size={24} color={Theme.colors.text} />
+            <ProfessionalIcon name="chatbubble-outline" size={24} color={Theme.colors.text} />
             {messageCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
@@ -446,11 +447,11 @@ export default function HomeScreen({ navigation }) {
             style={styles.noScoreContainer}
             onPress={() => navigation.navigate('Assessments')}
           >
-            <Ionicons name="analytics-outline" size={20} color={Theme.colors.primary} />
+            <ProfessionalIcon name="analytics-outline" size={20} color={Theme.colors.primary} />
             <Text style={styles.noScoreText}>
               Complete an assessment to get your AI Score & National Rank
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={Theme.colors.primary} />
+            <ProfessionalIcon name="chevron-forward" size={16} color={Theme.colors.primary} />
           </TouchableOpacity>
         )}
       </View>
@@ -484,7 +485,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.postInputAction}
             onPress={() => navigation.navigate('CreatePost', { mediaType: 'photo' })}
           >
-            <Ionicons name="image" size={20} color={Theme.colors.primary} />
+            <ProfessionalIcon name="image" size={20} color={Theme.colors.primary} />
             <Text style={styles.postInputActionText}>Photo</Text>
           </TouchableOpacity>
           
@@ -492,7 +493,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.postInputAction}
             onPress={() => navigation.navigate('CreatePost', { mediaType: 'video' })}
           >
-            <Ionicons name="videocam" size={20} color={Theme.colors.secondary} />
+            <ProfessionalIcon name="videocam" size={20} color={Theme.colors.secondary} />
             <Text style={styles.postInputActionText}>Video</Text>
           </TouchableOpacity>
           
@@ -500,7 +501,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.postInputAction}
             onPress={() => navigation.navigate('Assessments')}
           >
-            <Ionicons name="analytics" size={20} color={Theme.colors.accent} />
+            <ProfessionalIcon name="analytics" size={20} color={Theme.colors.accent} />
             <Text style={styles.postInputActionText}>AI Score</Text>
           </TouchableOpacity>
         </View>
@@ -511,80 +512,6 @@ export default function HomeScreen({ navigation }) {
   // ==========================================
   // RENDER: ASSESSMENT SECTION
   // ==========================================
-  const renderAssessmentSection = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>🎯 AI Performance Assessment</Text>
-      
-      <TouchableOpacity 
-        style={styles.assessmentCard}
-        onPress={() => navigation.navigate('Assessments')}
-        activeOpacity={0.9}
-      >
-        <LinearGradient
-          colors={[Theme.colors.primary, Theme.colors.secondary]}
-          style={styles.assessmentGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.assessmentContent}>
-            <View style={styles.assessmentLeft}>
-              <Text style={styles.assessmentTitle}>Get Your AI Score</Text>
-              <Text style={styles.assessmentDescription}>
-                Analyze your performance with our advanced AI system
-              </Text>
-              <View style={styles.assessmentFeatures}>
-                <View style={styles.assessmentFeature}>
-                  <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                  <Text style={styles.assessmentFeatureText}>Video Analysis</Text>
-                </View>
-                <View style={styles.assessmentFeature}>
-                  <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                  <Text style={styles.assessmentFeatureText}>Instant Results</Text>
-                </View>
-                <View style={styles.assessmentFeature}>
-                  <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                  <Text style={styles.assessmentFeatureText}>National Ranking</Text>
-                </View>
-              </View>
-            </View>
-            <View style={styles.assessmentRight}>
-              <View style={styles.assessmentIconContainer}>
-                <FontAwesome5 name="brain" size={48} color="#fff" />
-              </View>
-              <Text style={styles.assessmentCTA}>Start Now →</Text>
-            </View>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
-
-      {/* Quick Actions */}
-      <View style={styles.quickAssessmentActions}>
-        <TouchableOpacity 
-          style={styles.quickAssessmentButton}
-          onPress={() => navigation.navigate('Assessments', { action: 'upload' })}
-        >
-          <Ionicons name="videocam" size={24} color={Theme.colors.primary} />
-          <Text style={styles.quickAssessmentText}>Upload Video</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.quickAssessmentButton}
-          onPress={() => navigation.navigate('Assessments', { action: 'reports' })}
-        >
-          <Ionicons name="document-text" size={24} color={Theme.colors.secondary} />
-          <Text style={styles.quickAssessmentText}>View Reports</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.quickAssessmentButton}
-          onPress={() => navigation.navigate('Rankings')}
-        >
-          <Ionicons name="trophy" size={24} color={Theme.colors.accent} />
-          <Text style={styles.quickAssessmentText}>Rankings</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
 
   // ==========================================
   // RENDER: FEED POST
@@ -613,7 +540,7 @@ export default function HomeScreen({ navigation }) {
               />
               {item.is_ai_verified && (
                 <View style={styles.verifiedIndicator}>
-                  <Ionicons name="checkmark" size={10} color={Theme.colors.text} />
+                  <ProfessionalIcon name="checkmark" size={10} color={Theme.colors.text} />
                 </View>
               )}
             </TouchableOpacity>
@@ -626,7 +553,7 @@ export default function HomeScreen({ navigation }) {
                     style={styles.miniConnectButton}
                     onPress={() => handleConnect(item.user.id)}
                   >
-                    <Ionicons name="person-add" size={14} color={Theme.colors.primary} />
+                    <ProfessionalIcon name="person-add" size={14} color={Theme.colors.primary} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -643,7 +570,7 @@ export default function HomeScreen({ navigation }) {
                 setShowPostOptions(true);
               }}
             >
-              <Ionicons name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
+              <ProfessionalIcon name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
           
@@ -659,79 +586,79 @@ export default function HomeScreen({ navigation }) {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="shield-checkmark" size={16} color="#fff" />
+                <ProfessionalIcon name="shield-checkmark" size={16} color="#fff" />
                 <Text style={styles.aiVerifiedText}>AI Verified Performance</Text>
               </LinearGradient>
             </View>
           )}
           
           {/* Media */}
-          {item.content.media_url && (
-            <TouchableOpacity style={styles.mediaPlaceholder}>
-              <Image 
-                source={{ uri: item.content.media_url }} 
-                style={styles.postMedia}
-                resizeMode="cover"
-              />
-              {item.content.media_type === 'video' && (
-                <View style={styles.playButton}>
-                  <Ionicons name="play" size={32} color={Theme.colors.text} />
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
-          
-          {/* Engagement */}
-          <View style={styles.engagementContainer}>
-            {/* Like Button */}
-            <TouchableOpacity 
-              style={styles.engagementButton}
-              onPress={() => handleLikePost(item.id, item.is_liked)}
-            >
-              <Ionicons 
-                name={item.is_liked ? "heart" : "heart-outline"} 
-                size={24} 
-                color={item.is_liked ? Theme.colors.accent : Theme.colors.text} 
-              />
-              <Text style={[
-                styles.engagementCount,
-                item.is_liked && { color: Theme.colors.accent }
-              ]}>
-                {item.likes_count}
-              </Text>
-            </TouchableOpacity>
-            
-            {/* Comment Button */}
-            <TouchableOpacity 
-              style={styles.engagementButton}
-              onPress={() => navigation.navigate('Comments', { 
-                postId: item.id,
-                postText: item.content.text,
-                postUserName: item.user.name
-              })}
-            >
-              <Ionicons name="chatbubble-outline" size={22} color={Theme.colors.text} />
-              <Text style={styles.engagementCount}>{item.comments_count}</Text>
-            </TouchableOpacity>
-            
-            {/* Share Button */}
-            <TouchableOpacity 
-              style={styles.engagementButton}
-              onPress={() => handleSharePost(item)}
-            >
-              <Ionicons name="share-outline" size={22} color={Theme.colors.text} />
-              <Text style={styles.engagementCount}>{item.shares_count}</Text>
-            </TouchableOpacity>
-            
-            {/* Bookmark Button */}
-            <TouchableOpacity style={styles.engagementButton}>
-              <Ionicons name="bookmark-outline" size={22} color={Theme.colors.text} />
-            </TouchableOpacity>
-          </View>
-        </View>
+{item.content.media_url && (
+             <TouchableOpacity style={styles.mediaPlaceholder}>
+               <Image 
+                 source={{ uri: item.content.media_url }} 
+                 style={styles.postMedia}
+                 resizeMode="cover"
+               />
+               {item.content.media_type === 'video' && (
+                 <View style={styles.playButton}>
+                   <ProfessionalIcon name="play" size={32} color={Theme.colors.text} />
+                 </View>
+               )}
+             </TouchableOpacity>
+           )}
+           
+           {/* Engagement */}
+           <View style={styles.engagementContainer}>
+             {/* Like Button */}
+             <TouchableOpacity 
+               style={styles.engagementButton}
+               onPress={() => handleLikePost(item.id, item.is_liked)}
+             >
+               <ProfessionalIcon 
+                 name={item.is_liked ? "heart" : "heart-outline"} 
+                 size={24} 
+                 color={item.is_liked ? Theme.colors.accent : Theme.colors.text} 
+               />
+               <Text style={[
+                 styles.engagementCount,
+                 item.is_liked && { color: Theme.colors.accent }
+               ]}>
+                 {item.likes_count}
+               </Text>
+             </TouchableOpacity>
+             
+             {/* Comment Button */}
+             <TouchableOpacity 
+               style={styles.engagementButton}
+               onPress={() => navigation.navigate('Comments', { 
+                 postId: item.id,
+                 postText: item.content.text,
+                 postUserName: item.user.name
+               })}
+             >
+               <ProfessionalIcon name="chatbubble-outline" size={22} color={Theme.colors.text} />
+               <Text style={styles.engagementCount}>{item.comments_count}</Text>
+             </TouchableOpacity>
+             
+             {/* Share Button */}
+             <TouchableOpacity 
+               style={styles.engagementButton}
+               onPress={() => handleSharePost(item)}
+             >
+               <ProfessionalIcon name="share-outline" size={22} color={Theme.colors.text} />
+               <Text style={styles.engagementCount}>{item.shares_count}</Text>
+             </TouchableOpacity>
+             
+             {/* Bookmark Button */}
+             <TouchableOpacity style={styles.engagementButton}>
+               <ProfessionalIcon name="bookmark-outline" size={22} color={Theme.colors.text} />
+             </TouchableOpacity>
+            </View>
+         </View>
       </View>
-    );
-  };
+     );
+   };
 
   // ==========================================
   // RENDER: TRENDING ATHLETES
@@ -742,7 +669,10 @@ export default function HomeScreen({ navigation }) {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🔥 Trending Athletes</Text>
+          <View style={styles.sectionTitleRow}>
+            <ProfessionalIcon name="flame" size={20} color="#FF6B35" style={styles.sectionTitleIcon} />
+            <Text style={styles.sectionTitle}>Trending Athletes</Text>
+          </View>
           <TouchableOpacity onPress={() => navigation.navigate('TrendingAthletes')}>
             <Text style={styles.seeAllText}>See All</Text>
           </TouchableOpacity>
@@ -785,7 +715,11 @@ export default function HomeScreen({ navigation }) {
     
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📢 Opportunities & Events</Text>
+        <View style={styles.sectionTitleRow}>
+          <ProfessionalIcon name="megaphone" size={20} color={Theme.colors.primary} style={styles.sectionTitleIcon} />
+          <Text style={styles.sectionTitle}>Opportunities & Events</Text>
+        </View>
+
         
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {announcements.map((announcement, index) => (
@@ -820,7 +754,10 @@ export default function HomeScreen({ navigation }) {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🤝 Suggested Connections</Text>
+          <View style={styles.sectionTitleRow}>
+            <ProfessionalIcon name="people" size={20} color={Theme.colors.secondary} style={styles.sectionTitleIcon} />
+            <Text style={styles.sectionTitle}>Suggested Connections</Text>
+          </View>
           <TouchableOpacity onPress={() => navigation.navigate('Connections')}>
             <Text style={styles.seeAllText}>See All</Text>
           </TouchableOpacity>
@@ -848,7 +785,7 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.connectionName} numberOfLines={1}>{connection.name}</Text>
                 <Text style={styles.connectionSport}>{connection.sport}</Text>
                 <View style={styles.locationContainer}>
-                  <Ionicons name="location" size={12} color={Theme.colors.error} />
+                  <ProfessionalIcon name="location" size={12} color={Theme.colors.error} />
                   <Text style={styles.connectionLocation}>{connection.location || 'India'}</Text>
                 </View>
               </TouchableOpacity>
@@ -882,7 +819,7 @@ export default function HomeScreen({ navigation }) {
   // ==========================================
   const renderError = () => (
     <View style={styles.errorContainer}>
-      <Ionicons name="alert-circle" size={48} color={Theme.colors.error} />
+      <ProfessionalIcon name="alert-circle" size={48} color={Theme.colors.error} />
       <Text style={styles.errorText}>Unable to load content</Text>
       <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
         <Text style={styles.retryText}>Retry</Text>
@@ -912,7 +849,7 @@ export default function HomeScreen({ navigation }) {
   // ==========================================
   const renderEmptyFeed = () => (
     <View style={styles.emptyFeedContainer}>
-      <Ionicons name="newspaper-outline" size={64} color={Theme.colors.textSecondary} />
+      <ProfessionalIcon name="newspaper-outline" size={64} color={Theme.colors.textSecondary} />
       <Text style={styles.emptyFeedTitle}>No posts yet</Text>
       <Text style={styles.emptyFeedText}>
         Be the first to share your achievements!
@@ -921,7 +858,7 @@ export default function HomeScreen({ navigation }) {
         style={styles.createFirstPostButton}
         onPress={() => navigation.navigate('CreatePost')}
       >
-        <Ionicons name="add" size={20} color="#fff" />
+        <ProfessionalIcon name="add" size={20} color="#fff" />
         <Text style={styles.createFirstPostText}>Create Post</Text>
       </TouchableOpacity>
     </View>
@@ -984,7 +921,6 @@ export default function HomeScreen({ navigation }) {
           <>
             {renderUserGreeting()}
             {renderPostInput()}
-            {renderAssessmentSection()}
             {renderTrendingAthletes()}
             {renderAnnouncements()}
             {renderSuggestedConnections()}
@@ -1250,9 +1186,9 @@ const styles = StyleSheet.create({
     padding: Theme.spacing.lg,
   },
   postInputAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     marginRight: Theme.spacing.md,
     borderWidth: 2,
     borderColor: Theme.colors.primary,
@@ -1293,11 +1229,20 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.lg,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: Theme.colors.text,
+    marginBottom: 0,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginHorizontal: Theme.spacing.md,
     marginBottom: Theme.spacing.lg,
+    gap: 8,
+  },
+  sectionTitleIcon: {
+    marginRight: 2,
   },
   seeAllText: {
     fontSize: 14,
@@ -1543,8 +1488,8 @@ const styles = StyleSheet.create({
     marginHorizontal: Theme.spacing.md,
     borderRadius: Theme.borderRadius.xl,
     padding: Theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 2,
+    borderColor: Theme.colors.primary,
   },
   postHeader: {
     flexDirection: 'row',
@@ -1556,9 +1501,9 @@ const styles = StyleSheet.create({
     marginRight: Theme.spacing.md,
   },
   profilePhoto: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 2,
     borderColor: Theme.colors.primary,
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -1627,10 +1572,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mediaPlaceholder: {
-    height: 200,
+    height: 250,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: Theme.borderRadius.lg,
-    marginBottom: Theme.spacing.md,
     overflow: 'hidden',
     position: 'relative',
   },

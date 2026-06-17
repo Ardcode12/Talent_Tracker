@@ -11,7 +11,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { Theme } from '../constants/Theme';
 
@@ -182,7 +182,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
               {/* Share Options */}
               <TouchableOpacity style={styles.option} onPress={handleShare}>
                 <View style={[styles.optionIcon, { backgroundColor: Theme.colors.primary + '20' }]}>
-                  <Ionicons name="share-social" size={22} color={Theme.colors.primary} />
+                  <ProfessionalIcon name="share-social" size={22} color={Theme.colors.primary} />
                 </View>
                 <View style={styles.optionContent}>
                   <Text style={styles.optionText}>Share Post</Text>
@@ -192,7 +192,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
 
               <TouchableOpacity style={styles.option} onPress={handleCopyLink}>
                 <View style={[styles.optionIcon, { backgroundColor: Theme.colors.secondary + '20' }]}>
-                  <Ionicons name="link" size={22} color={Theme.colors.secondary} />
+                  <ProfessionalIcon name="link" size={22} color={Theme.colors.secondary} />
                 </View>
                 <View style={styles.optionContent}>
                   <Text style={styles.optionText}>Copy Link</Text>
@@ -204,7 +204,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
               {!isOwnPost && (
                 <TouchableOpacity style={styles.option} onPress={handleViewProfile}>
                   <View style={[styles.optionIcon, { backgroundColor: Theme.colors.accent + '20' }]}>
-                    <Ionicons name="person" size={22} color={Theme.colors.accent} />
+                    <ProfessionalIcon name="person" size={22} color={Theme.colors.accent} />
                   </View>
                   <View style={styles.optionContent}>
                     <Text style={styles.optionText}>View Profile</Text>
@@ -220,7 +220,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
                   
                   <TouchableOpacity style={styles.option} onPress={handleEdit}>
                     <View style={[styles.optionIcon, { backgroundColor: '#3498db20' }]}>
-                      <Ionicons name="create" size={22} color="#3498db" />
+                      <ProfessionalIcon name="create" size={22} color="#3498db" />
                     </View>
                     <View style={styles.optionContent}>
                       <Text style={styles.optionText}>Edit Post</Text>
@@ -230,7 +230,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
 
                   <TouchableOpacity style={styles.option} onPress={handleDelete}>
                     <View style={[styles.optionIcon, { backgroundColor: (Theme.colors.error || '#e74c3c') + '20' }]}>
-                      <Ionicons name="trash" size={22} color={Theme.colors.error || '#e74c3c'} />
+                      <ProfessionalIcon name="trash" size={22} color={Theme.colors.error || '#e74c3c'} />
                     </View>
                     <View style={styles.optionContent}>
                       <Text style={[styles.optionText, { color: Theme.colors.error || '#e74c3c' }]}>Delete Post</Text>
@@ -247,7 +247,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
                   
                   <TouchableOpacity style={styles.option} onPress={handleReport}>
                     <View style={[styles.optionIcon, { backgroundColor: '#f39c1220' }]}>
-                      <Ionicons name="flag" size={22} color="#f39c12" />
+                      <ProfessionalIcon name="flag" size={22} color="#f39c12" />
                     </View>
                     <View style={styles.optionContent}>
                       <Text style={styles.optionText}>Report Post</Text>

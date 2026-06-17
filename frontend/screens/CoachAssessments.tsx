@@ -17,7 +17,8 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { Theme } from '../constants/Theme';
 import { 
   getCoachAssessments, 
@@ -336,7 +337,7 @@ export default function CoachAssessments({ navigation }: any) {
                 <Text style={styles.athleteName}>{item.athlete.name}</Text>
                 {item.is_personal_best && (
                   <View style={styles.pbBadge}>
-                    <Ionicons name="trophy" size={10} color="#fff" />
+                    <ProfessionalIcon name="trophy" size={10} color="#fff" />
                     <Text style={styles.pbText}>PB</Text>
                   </View>
                 )}
@@ -400,7 +401,7 @@ export default function CoachAssessments({ navigation }: any) {
               }
             }}
           >
-            <Ionicons name="play-circle" size={20} color={Theme.colors.primary} />
+            <ProfessionalIcon name="play-circle" size={20} color={Theme.colors.primary} />
             <Text style={styles.actionText}>View Video</Text>
           </TouchableOpacity>
           
@@ -410,7 +411,7 @@ export default function CoachAssessments({ navigation }: any) {
               assessmentId: item.id 
             })}
           >
-            <Ionicons name="document-text" size={20} color={Theme.colors.secondary} />
+            <ProfessionalIcon name="document-text" size={20} color={Theme.colors.secondary} />
             <Text style={styles.actionText}>Full Report</Text>
           </TouchableOpacity>
         </View>
@@ -433,7 +434,7 @@ export default function CoachAssessments({ navigation }: any) {
           style={[styles.viewModeButton, viewMode === 'list' && styles.viewModeButtonActive]}
           onPress={() => setViewMode('list')}
         >
-          <Ionicons 
+          <ProfessionalIcon 
             name="list" 
             size={20} 
             color={viewMode === 'list' ? '#fff' : Theme.colors.textSecondary} 
@@ -449,7 +450,7 @@ export default function CoachAssessments({ navigation }: any) {
           style={[styles.viewModeButton, viewMode === 'stats' && styles.viewModeButtonActive]}
           onPress={() => setViewMode('stats')}
         >
-          <Ionicons 
+          <ProfessionalIcon 
             name="stats-chart" 
             size={20} 
             color={viewMode === 'stats' ? '#fff' : Theme.colors.textSecondary} 
@@ -482,7 +483,7 @@ export default function CoachAssessments({ navigation }: any) {
           {/* Search Bar */}
           <View style={styles.searchContainer}>
             <View style={styles.searchBar}>
-              <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
+              <ProfessionalIcon name="search" size={20} color={Theme.colors.textSecondary} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search athlete, sport, or test..."
@@ -493,7 +494,7 @@ export default function CoachAssessments({ navigation }: any) {
               />
               {filters.search.length > 0 && (
                 <TouchableOpacity onPress={() => handleFilterChange('search', '')}>
-                  <Ionicons name="close-circle" size={20} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="close-circle" size={20} color={Theme.colors.textSecondary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -505,7 +506,7 @@ export default function CoachAssessments({ navigation }: any) {
               ]}
               onPress={() => setShowFilters(true)}
             >
-              <Ionicons 
+              <ProfessionalIcon 
                 name="filter" 
                 size={20} 
                 color={(filters.minScore || filters.maxScore) ? '#fff' : Theme.colors.primary} 
@@ -657,7 +658,7 @@ export default function CoachAssessments({ navigation }: any) {
                   </Text>
                 </View>
                 <View style={styles.improvementScoreContainer}>
-                  <Ionicons name="trending-up" size={24} color={Theme.colors.success} />
+                  <ProfessionalIcon name="trending-up" size={24} color={Theme.colors.success} />
                   <Text style={styles.improvementValue}>+{improvement.improvement}%</Text>
                 </View>
               </View>
@@ -670,7 +671,7 @@ export default function CoachAssessments({ navigation }: any) {
       {!statistics?.best_scores_by_type?.length && 
        !statistics?.top_performers?.length && (
         <View style={styles.emptyContainer}>
-          <Ionicons name="analytics-outline" size={64} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="analytics-outline" size={64} color={Theme.colors.textSecondary} />
           <Text style={styles.emptyText}>No statistics available</Text>
           <Text style={styles.emptySubtext}>
             Statistics will appear once your athletes complete assessments
@@ -692,7 +693,7 @@ export default function CoachAssessments({ navigation }: any) {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Filter Assessments</Text>
             <TouchableOpacity onPress={() => setShowFilters(false)}>
-              <Ionicons name="close" size={24} color={Theme.colors.text} />
+              <ProfessionalIcon name="close" size={24} color={Theme.colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -765,7 +766,7 @@ export default function CoachAssessments({ navigation }: any) {
                   ]}
                   onPress={() => handleFilterChange('sortOrder', option.key)}
                 >
-                  <Ionicons 
+                  <ProfessionalIcon 
                     name={option.icon as any} 
                     size={16} 
                     color={filters.sortOrder === option.key ? '#fff' : Theme.colors.textSecondary} 
@@ -834,7 +835,7 @@ export default function CoachAssessments({ navigation }: any) {
 
   const renderError = () => (
     <View style={styles.errorContainer}>
-      <Ionicons name="alert-circle-outline" size={64} color={Theme.colors.error} />
+      <ProfessionalIcon name="alert-circle-outline" size={64} color={Theme.colors.error} />
       <Text style={styles.errorText}>{error}</Text>
       <TouchableOpacity 
         style={styles.retryButton}

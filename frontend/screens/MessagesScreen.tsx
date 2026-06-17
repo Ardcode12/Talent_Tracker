@@ -12,7 +12,7 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import { getImageUrlWithFallback } from '../services/api';
 import { Theme } from '../constants/Theme';
@@ -180,7 +180,7 @@ export default function MessagesScreen({ navigation }) {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
+        <ProfessionalIcon name="search" size={20} color={Theme.colors.textSecondary} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations..."
@@ -190,7 +190,7 @@ export default function MessagesScreen({ navigation }) {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="close-circle" size={20} color={Theme.colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -213,7 +213,7 @@ export default function MessagesScreen({ navigation }) {
         ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons 
+            <ProfessionalIcon 
               name="chatbubbles-outline" 
               size={80} 
               color={Theme.colors.textSecondary} 
@@ -226,7 +226,7 @@ export default function MessagesScreen({ navigation }) {
               style={styles.startButton}
               onPress={() => navigation.navigate('NewMessage')}
             >
-              <Ionicons name="add" size={20} color="#fff" />
+              <ProfessionalIcon name="add" size={20} color="#fff" />
               <Text style={styles.startButtonText}>Start a Conversation</Text>
             </TouchableOpacity>
           </View>
@@ -238,7 +238,7 @@ export default function MessagesScreen({ navigation }) {
         style={styles.fab}
         onPress={() => navigation.navigate('NewMessage')}
       >
-        <Ionicons name="create" size={24} color="#fff" />
+        <ProfessionalIcon name="create" size={24} color="#fff" />
       </TouchableOpacity>
     </View>
   );

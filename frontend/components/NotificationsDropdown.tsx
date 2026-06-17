@@ -13,7 +13,7 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import { Theme } from '../constants/Theme';
 import { getNotifications, markAllNotificationsRead } from '../services/api';
 
@@ -165,7 +165,7 @@ export default function NotificationsDropdown({
       >
         {/* Icon */}
         <View style={[styles.iconContainer, { backgroundColor: icon.bg }]}>
-          <Ionicons name={icon.name as any} size={20} color={icon.color} />
+          <ProfessionalIcon name={icon.name as any} size={20} color={icon.color} />
         </View>
 
         {/* Text */}
@@ -183,7 +183,7 @@ export default function NotificationsDropdown({
             <Text style={styles.time}>{formatTime(item.created_at)}</Text>
             {(isAssessment || isMessage) && (
               <View style={styles.tapHint}>
-                <Ionicons name="arrow-forward-circle" size={13} color={icon.color} />
+                <ProfessionalIcon name="arrow-forward-circle" size={13} color={icon.color} />
                 <Text style={[styles.tapHintText, { color: icon.color }]}>
                   {isAssessment ? 'View Results' : 'Open Chat'}
                 </Text>
@@ -218,7 +218,7 @@ export default function NotificationsDropdown({
             )}
           </View>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Ionicons name="close" size={20} color={Theme.colors.text} />
+            <ProfessionalIcon name="close" size={20} color={Theme.colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -230,7 +230,7 @@ export default function NotificationsDropdown({
           </View>
         ) : notifications.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-off-outline" size={56} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="notifications-off-outline" size={56} color={Theme.colors.textSecondary} />
             <Text style={styles.emptyTitle}>No Notifications</Text>
             <Text style={styles.emptyText}>You're all caught up!</Text>
           </View>
@@ -254,7 +254,7 @@ export default function NotificationsDropdown({
           }}
         >
           <Text style={styles.footerText}>See All Notifications</Text>
-          <Ionicons name="chevron-forward" size={16} color={Theme.colors.primary} />
+          <ProfessionalIcon name="chevron-forward" size={16} color={Theme.colors.primary} />
         </TouchableOpacity>
       </Animated.View>
 

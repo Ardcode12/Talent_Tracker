@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import { Theme } from '../constants/Theme';
 import {
@@ -176,7 +176,7 @@ export default function NotificationsScreen({ navigation }: any) {
       >
         {/* Icon circle */}
         <View style={[styles.iconContainer, { backgroundColor: icon.bg }]}>
-          <Ionicons name={icon.name as any} size={22} color={icon.color} />
+          <ProfessionalIcon name={icon.name as any} size={22} color={icon.color} />
         </View>
 
         {/* Content */}
@@ -194,7 +194,7 @@ export default function NotificationsScreen({ navigation }: any) {
             <Text style={styles.time}>{formatTime(item.created_at)}</Text>
             {isAssessment && (
               <View style={styles.tapHint}>
-                <Ionicons name="arrow-forward-circle" size={14} color={icon.color} />
+                <ProfessionalIcon name="arrow-forward-circle" size={14} color={icon.color} />
                 <Text style={[styles.tapHintText, { color: icon.color }]}>
                   View Results
                 </Text>
@@ -221,7 +221,7 @@ export default function NotificationsScreen({ navigation }: any) {
       </View>
       {unreadCount > 0 && (
         <TouchableOpacity style={styles.markAllBtn} onPress={handleMarkAllRead}>
-          <Ionicons name="checkmark-done" size={16} color={Theme.colors.primary} />
+          <ProfessionalIcon name="checkmark-done" size={16} color={Theme.colors.primary} />
           <Text style={styles.markAllText}>Mark all read</Text>
         </TouchableOpacity>
       )}
@@ -231,7 +231,7 @@ export default function NotificationsScreen({ navigation }: any) {
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
-        <Ionicons
+        <ProfessionalIcon
           name="notifications-off-outline"
           size={64}
           color={Theme.colors.textSecondary}

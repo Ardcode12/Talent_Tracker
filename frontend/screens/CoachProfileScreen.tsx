@@ -19,7 +19,8 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -302,7 +303,7 @@ export default function CoachProfileScreen() {
         />
         <View style={styles.editPhotoButton}>
           <TouchableOpacity onPress={openEditModal}>
-            <Ionicons name="camera" size={16} color="#fff" />
+            <ProfessionalIcon name="camera" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -314,7 +315,7 @@ export default function CoachProfileScreen() {
       
       {userData?.experience && (
         <View style={styles.experienceBadge}>
-          <Ionicons name="time" size={14} color={Theme.colors.accent} />
+          <ProfessionalIcon name="time" size={14} color={Theme.colors.accent} />
           <Text style={styles.experienceText}>
             {userData.experience} years experience
           </Text>
@@ -323,7 +324,7 @@ export default function CoachProfileScreen() {
       
       {userData?.location && (
         <View style={styles.locationRow}>
-          <Ionicons name="location" size={14} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="location" size={14} color={Theme.colors.textSecondary} />
           <Text style={styles.locationText}>{userData.location}</Text>
         </View>
       )}
@@ -369,7 +370,7 @@ export default function CoachProfileScreen() {
       {/* Action Buttons */}
       <View style={styles.actionButtonsRow}>
         <TouchableOpacity style={styles.editButton} onPress={openEditModal}>
-          <Ionicons name="create-outline" size={18} color="#fff" />
+          <ProfessionalIcon name="create-outline" size={18} color="#fff" />
           <Text style={styles.editButtonText}>Edit Profile</Text>
         </TouchableOpacity>
         
@@ -377,11 +378,11 @@ export default function CoachProfileScreen() {
           style={styles.iconButton}
           onPress={() => Alert.alert('Share', 'Share profile feature coming soon!')}
         >
-          <Ionicons name="share-social-outline" size={20} color={Theme.colors.text} />
+          <ProfessionalIcon name="share-social-outline" size={20} color={Theme.colors.text} />
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={18} color="#fff" />
+          <ProfessionalIcon name="log-out-outline" size={18} color="#fff" />
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
       </View>
@@ -407,7 +408,7 @@ export default function CoachProfileScreen() {
             style={[styles.tab, activeTab === tab.id && styles.activeTab]}
             onPress={() => setActiveTab(tab.id)}
           >
-            <Ionicons 
+            <ProfessionalIcon 
               name={tab.icon as any} 
               size={18} 
               color={activeTab === tab.id ? Theme.colors.primary : Theme.colors.textSecondary} 
@@ -447,7 +448,7 @@ export default function CoachProfileScreen() {
             <View style={styles.coachStatDivider} />
             
             <View style={styles.coachStatItem}>
-              <Ionicons name="document-text" size={24} color="#2ecc71" />
+              <ProfessionalIcon name="document-text" size={24} color="#2ecc71" />
               <Text style={styles.coachStatValue}>
                 {coachStats?.total_assessments || 0}
               </Text>
@@ -457,7 +458,7 @@ export default function CoachProfileScreen() {
             <View style={styles.coachStatDivider} />
             
             <View style={styles.coachStatItem}>
-              <Ionicons name="notifications" size={24} color="#e74c3c" />
+              <ProfessionalIcon name="notifications" size={24} color="#e74c3c" />
               <Text style={styles.coachStatValue}>
                 {coachStats?.pending_requests || 0}
               </Text>
@@ -492,7 +493,7 @@ export default function CoachProfileScreen() {
               colors={['#2ecc71', '#27ae60']}
               style={styles.quickActionGradient}
             >
-              <Ionicons name="analytics" size={24} color="#fff" />
+              <ProfessionalIcon name="analytics" size={24} color="#fff" />
               <Text style={styles.quickActionText}>Assessments</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -505,7 +506,7 @@ export default function CoachProfileScreen() {
               colors={['#9b59b6', '#8e44ad']}
               style={styles.quickActionGradient}
             >
-              <Ionicons name="chatbubbles" size={24} color="#fff" />
+              <ProfessionalIcon name="chatbubbles" size={24} color="#fff" />
               <Text style={styles.quickActionText}>Messages</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -518,7 +519,7 @@ export default function CoachProfileScreen() {
               colors={['#e74c3c', '#c0392b']}
               style={styles.quickActionGradient}
             >
-              <Ionicons name="person-add" size={24} color="#fff" />
+              <ProfessionalIcon name="person-add" size={24} color="#fff" />
               <Text style={styles.quickActionText}>Find Athletes</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -574,7 +575,7 @@ export default function CoachProfileScreen() {
                 </Text>
               </View>
               <View style={styles.improvementScore}>
-                <Ionicons name="trending-up" size={20} color={Theme.colors.success} />
+                <ProfessionalIcon name="trending-up" size={20} color={Theme.colors.success} />
                 <Text style={styles.improvementValue}>+{improvement.improvement}%</Text>
               </View>
             </View>
@@ -628,7 +629,7 @@ export default function CoachProfileScreen() {
             onPress={() => navigation.navigate('Athletes' as never)}
           >
             <Text style={styles.viewAllButtonText}>View All Athletes</Text>
-            <Ionicons name="arrow-forward" size={18} color={Theme.colors.primary} />
+            <ProfessionalIcon name="arrow-forward" size={18} color={Theme.colors.primary} />
           </TouchableOpacity>
         </>
       ) : (
@@ -693,12 +694,12 @@ export default function CoachProfileScreen() {
             onPress={() => navigation.navigate('Assessments' as never)}
           >
             <Text style={styles.viewAllButtonText}>View All Assessments</Text>
-            <Ionicons name="arrow-forward" size={18} color={Theme.colors.primary} />
+            <ProfessionalIcon name="arrow-forward" size={18} color={Theme.colors.primary} />
           </TouchableOpacity>
         </>
       ) : (
         <View style={styles.emptyState}>
-          <Ionicons name="analytics-outline" size={64} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="analytics-outline" size={64} color={Theme.colors.textSecondary} />
           <Text style={styles.emptyStateTitle}>No Assessment Data</Text>
           <Text style={styles.emptyStateText}>
             Assessment statistics will appear here as your athletes complete tests
@@ -737,7 +738,7 @@ export default function CoachProfileScreen() {
           <View style={styles.achievementsCard}>
             {parseAchievements(userData.achievements).map((achievement, index) => (
               <View key={index} style={styles.achievementItem}>
-                <Ionicons name="star" size={16} color={Theme.colors.accent} />
+                <ProfessionalIcon name="star" size={16} color={Theme.colors.accent} />
                 <Text style={styles.achievementText}>{achievement}</Text>
               </View>
             ))}
@@ -751,7 +752,7 @@ export default function CoachProfileScreen() {
     <>
       <View style={styles.infoRow}>
         <View style={styles.infoIconContainer}>
-          <Ionicons name={icon as any} size={20} color={Theme.colors.primary} />
+          <ProfessionalIcon name={icon as any} size={20} color={Theme.colors.primary} />
         </View>
         <View style={styles.infoContent}>
           <Text style={styles.infoLabel}>{label}</Text>
@@ -771,7 +772,7 @@ export default function CoachProfileScreen() {
         <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Ionicons name="close" size={28} color={Theme.colors.text} />
+              <ProfessionalIcon name="close" size={28} color={Theme.colors.text} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Edit Coach Profile</Text>
             <TouchableOpacity onPress={handleSave} disabled={saving}>
@@ -791,7 +792,7 @@ export default function CoachProfileScreen() {
               style={styles.modalProfileImage}
             />
             <View style={styles.cameraIconOverlay}>
-              <Ionicons name="camera" size={20} color="#fff" />
+              <ProfessionalIcon name="camera" size={20} color="#fff" />
             </View>
             <Text style={styles.changePhotoText}>Change Photo</Text>
           </TouchableOpacity>

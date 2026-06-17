@@ -16,7 +16,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import Animated, { 
   FadeIn, 
   FadeOut, 
@@ -592,7 +592,7 @@ const handleSubmit = async () => {
           style={styles.likeSideButton}
           onPress={() => handleLikeComment(item.id, item.is_liked)}
         >
-          <Ionicons 
+          <ProfessionalIcon 
             name={item.is_liked ? "heart" : "heart-outline"} 
             size={16} 
             color={item.is_liked ? Theme.colors.accent : Theme.colors.textSecondary} 
@@ -671,7 +671,7 @@ const handleSubmit = async () => {
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="chatbubble-outline" size={64} color={Theme.colors.textSecondary} />
+      <ProfessionalIcon name="chatbubble-outline" size={64} color={Theme.colors.textSecondary} />
       <Text style={styles.emptyTitle}>No comments yet</Text>
       <Text style={styles.emptyText}>Be the first to comment!</Text>
     </View>
@@ -685,7 +685,7 @@ const handleSubmit = async () => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={Theme.colors.text} />
+          <ProfessionalIcon name="arrow-back" size={24} color={Theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Comments</Text>
         <View style={styles.headerRight}>
@@ -734,7 +734,7 @@ const handleSubmit = async () => {
               Replying to <Text style={styles.replyingToName}>@{replyingTo.userName}</Text>
             </Text>
             <TouchableOpacity onPress={handleCancelReply}>
-              <Ionicons name="close" size={20} color={Theme.colors.textSecondary} />
+              <ProfessionalIcon name="close" size={20} color={Theme.colors.textSecondary} />
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -763,7 +763,7 @@ const handleSubmit = async () => {
             {isSubmitting ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Ionicons name="send" size={20} color="#fff" />
+              <ProfessionalIcon name="send" size={20} color="#fff" />
             )}
           </TouchableOpacity>
         </View>

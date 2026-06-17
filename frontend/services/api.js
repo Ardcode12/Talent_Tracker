@@ -522,6 +522,32 @@ class ApiService {
     }
   }
 
+  static getBaseUrl() {
+    return BASE_URL;
+  }
+
+  // Generic GET helper — endpoint should NOT include /api/ prefix (e.g. '/events/')
+  static async get(endpoint) {
+    // Strip leading /api if caller accidentally included it
+    const path = endpoint.startsWith('/api/') ? endpoint.slice(4) : endpoint;
+    return this.makeAuthenticatedRequest(path, { method: 'GET' });
+  }
+
+  // Generic POST helper
+  static async post(endpoint, body) {
+    const path = endpoint.startsWith('/api/') ? endpoint.slice(4) : endpoint;
+    return this.makeAuthenticatedRequest(path, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  // Generic DELETE helper
+  static async delete(endpoint) {
+    const path = endpoint.startsWith('/api/') ? endpoint.slice(4) : endpoint;
+    return this.makeAuthenticatedRequest(path, { method: 'DELETE' });
+  }
+
   static async makeAuthenticatedRequest(endpoint, options = {}) {
     try {
       const token = await this.getAuthToken();
@@ -568,10 +594,10 @@ class ApiService {
 
       if (!response.ok) {
         if (response.status === 401 && !isPublicEndpoint) {
-          console.warn('Authentication failed, token might be expired');
-          await AsyncStorage.removeItem('authToken');
-          await AsyncStorage.removeItem('isLoggedIn');
-          return { data: [] };
+          // Don't wipe the token — just return empty so the UI degrades gracefully.
+          // The user will need to re-login if the token is truly expired.
+          console.warn('Authentication failed (401) - token may be expired');
+          return { data: [], _unauthorized: true };
         }
         throw new Error(data.detail || data.message || `HTTP error! status: ${response.status}`);
       }

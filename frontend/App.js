@@ -5,10 +5,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './components/ui/ProfessionalIcon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, ActivityIndicator, Platform } from 'react-native';
-import { getUnreadCount } from './services/api';
 
 // Import your screens
 import LoginScreen from './screens/LoginScreen';
@@ -26,6 +25,7 @@ import MessagesScreen from './screens/MessagesScreen';
 import ChatScreen from './screens/ChatScreen';
 import NewMessageScreen from './screens/NewMessageScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
+import EventsScreen from './screens/EventsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -47,23 +47,6 @@ function OwnCoachProfileScreen() {
 // ATHLETE TAB NAVIGATOR
 // ============================================
 function AthleteTabNavigator() {
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    checkUnreadMessages();
-    const interval = setInterval(checkUnreadMessages, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const checkUnreadMessages = async () => {
-    try {
-      const count = await getUnreadCount();
-      setUnreadCount(count);
-    } catch (error) {
-      console.error('Error checking unread messages:', error);
-    }
-  };
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -76,8 +59,8 @@ function AthleteTabNavigator() {
             case 'Assessments':
               iconName = focused ? 'compass' : 'compass-outline';
               break;
-            case 'Messages':
-              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+            case 'Events':
+              iconName = focused ? 'calendar' : 'calendar-outline';
               break;
             case 'Connections':
               iconName = focused ? 'people' : 'people-outline';
@@ -88,7 +71,7 @@ function AthleteTabNavigator() {
             default:
               iconName = 'alert-circle-outline';
           }
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <ProfessionalIcon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: '#8E8E93',
@@ -105,22 +88,11 @@ function AthleteTabNavigator() {
           fontSize: 11,
           fontWeight: '600',
         },
-        tabBarBadge: route.name === 'Messages' && unreadCount > 0 ? unreadCount : undefined,
-        tabBarBadgeStyle: {
-          backgroundColor: '#FF3B30',
-          color: '#fff',
-          fontSize: 10,
-          fontWeight: 'bold',
-        },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Assessments" component={ExploreScreen} />
-      <Tab.Screen 
-        name="Messages" 
-        component={MessagesScreen}
-        listeners={{ tabPress: () => checkUnreadMessages() }}
-      />
+      <Tab.Screen name="Events" component={EventsScreen} />
       <Tab.Screen name="Connections" component={ConnectionsScreen} />
       {/* USE OwnProfileScreen - NOT ProfileScreen */}
       <Tab.Screen name="Profile" component={OwnProfileScreen} />
@@ -132,23 +104,6 @@ function AthleteTabNavigator() {
 // COACH TAB NAVIGATOR
 // ============================================
 function CoachTabNavigator() {
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    checkUnreadMessages();
-    const interval = setInterval(checkUnreadMessages, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const checkUnreadMessages = async () => {
-    try {
-      const count = await getUnreadCount();
-      setUnreadCount(count);
-    } catch (error) {
-      console.error('Error checking unread messages:', error);
-    }
-  };
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -164,8 +119,8 @@ function CoachTabNavigator() {
             case 'Assessments':
               iconName = focused ? 'analytics' : 'analytics-outline';
               break;
-            case 'Messages':
-              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+            case 'Events':
+              iconName = focused ? 'calendar' : 'calendar-outline';
               break;
             case 'Profile':
               iconName = focused ? 'person' : 'person-outline';
@@ -173,9 +128,9 @@ function CoachTabNavigator() {
             default:
               iconName = 'alert-circle-outline';
           }
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <ProfessionalIcon name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#2c3e50',
+        tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: '#8E8E93',
         tabBarStyle: {
           backgroundColor: '#1a1a1a',
@@ -190,23 +145,12 @@ function CoachTabNavigator() {
           fontSize: 11,
           fontWeight: '600',
         },
-        tabBarBadge: route.name === 'Messages' && unreadCount > 0 ? unreadCount : undefined,
-        tabBarBadgeStyle: {
-          backgroundColor: '#FF3B30',
-          color: '#fff',
-          fontSize: 10,
-          fontWeight: 'bold',
-        },
       })}
     >
       <Tab.Screen name="Dashboard" component={CoachDashboard} />
       <Tab.Screen name="Athletes" component={ConnectionsScreen} />
       <Tab.Screen name="Assessments" component={CoachAssessments} />
-      <Tab.Screen 
-        name="Messages" 
-        component={MessagesScreen}
-        listeners={{ tabPress: () => checkUnreadMessages() }}
-      />
+      <Tab.Screen name="Events" component={EventsScreen} />
       {/* USE OwnCoachProfileScreen - NOT CoachProfileScreen */}
       <Tab.Screen name="Profile" component={OwnCoachProfileScreen} />
     </Tab.Navigator>
@@ -325,12 +269,16 @@ export default function App() {
 />
           {/* OTHER SCREENS */}
           <Stack.Screen name="CreatePost" component={CreatePostScreen} options={{ presentation: 'modal' }} />
+          <Stack.Screen name="Messages" component={MessagesScreen} />
           <Stack.Screen name="ChatScreen" component={ChatScreen} />
           <Stack.Screen name="NewMessage" component={NewMessageScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="ConnectionRequests" component={ConnectionsScreen} />
           <Stack.Screen name="AthleteDetail" component={ProfileScreen} />
           <Stack.Screen name="Rankings" component={ExploreScreen} />
+          <Stack.Screen name="CreateEvent" component={EventsScreen} options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="EventDetail" component={EventsScreen} />
+          <Stack.Screen name="EventRegistrations" component={EventsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

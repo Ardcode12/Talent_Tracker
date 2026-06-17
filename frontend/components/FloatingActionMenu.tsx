@@ -14,7 +14,7 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
 
@@ -86,7 +86,7 @@ export const FloatingActionMenu: React.FC = () => {
             style={[styles.menuItem, itemStyle]}
           >
             <TouchableOpacity style={[styles.menuButton, { backgroundColor: item.color }]}>
-              <Ionicons name={item.icon as any} size={24} color="#fff" />
+              <ProfessionalIcon name={item.icon as any} size={24} color="#fff" />
             </TouchableOpacity>
           </Animated.View>
         );
@@ -96,7 +96,7 @@ export const FloatingActionMenu: React.FC = () => {
       <TouchableOpacity onPress={toggleMenu} style={styles.mainButton}>
         <BlurView intensity={90} style={StyleSheet.absoluteFillObject} />
         <Animated.View style={mainButtonStyle}>
-          <Ionicons name="add" size={32} color="#fff" />
+          <ProfessionalIcon name="add" size={32} color="#fff" />
         </Animated.View>
       </TouchableOpacity>
     </View>

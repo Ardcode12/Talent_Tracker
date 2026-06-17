@@ -20,7 +20,8 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -601,7 +602,7 @@ export default function ProfileScreen() {
       {/* Back Button for External Profiles */}
       {!isOwnProfile && (
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Theme.colors.text} />
+          <ProfessionalIcon name="arrow-back" size={24} color={Theme.colors.text} />
         </TouchableOpacity>
       )}
       
@@ -612,7 +613,7 @@ export default function ProfileScreen() {
         />
         {userData?.is_verified && (
           <View style={styles.verifiedBadge}>
-            <Ionicons name="checkmark-circle" size={24} color={Theme.colors.success} />
+            <ProfessionalIcon name="checkmark-circle" size={24} color={Theme.colors.success} />
           </View>
         )}
         {userData?.is_online && <View style={styles.onlineBadge} />}
@@ -626,7 +627,7 @@ export default function ProfileScreen() {
       
       {userData?.location && (
         <View style={styles.locationRow}>
-          <Ionicons name="location" size={14} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="location" size={14} color={Theme.colors.textSecondary} />
           <Text style={styles.locationText}>{userData.location}</Text>
         </View>
       )}
@@ -670,16 +671,16 @@ export default function ProfileScreen() {
       {isOwnProfile ? (
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity style={styles.editButton} onPress={openEditModal}>
-            <Ionicons name="create-outline" size={18} color="#fff" />
+            <ProfessionalIcon name="create-outline" size={18} color="#fff" />
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.iconButton} onPress={() => Alert.alert('Share', 'Coming soon!')}>
-            <Ionicons name="share-social-outline" size={20} color={Theme.colors.text} />
+            <ProfessionalIcon name="share-social-outline" size={20} color={Theme.colors.text} />
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={18} color="#fff" />
+            <ProfessionalIcon name="log-out-outline" size={18} color="#fff" />
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -687,12 +688,12 @@ export default function ProfileScreen() {
         <View style={styles.externalActionButtons}>
           {connectionStatus === 'accepted' ? (
             <View style={styles.connectedBadge}>
-              <Ionicons name="checkmark-circle" size={18} color="#2ecc71" />
+              <ProfessionalIcon name="checkmark-circle" size={18} color="#2ecc71" />
               <Text style={styles.connectedText}>Connected</Text>
             </View>
           ) : connectionStatus === 'pending' ? (
             <View style={styles.pendingBadge}>
-              <Ionicons name="hourglass" size={18} color="#f39c12" />
+              <ProfessionalIcon name="hourglass" size={18} color="#f39c12" />
               <Text style={styles.pendingText}>Request Pending</Text>
             </View>
           ) : (
@@ -701,7 +702,7 @@ export default function ProfileScreen() {
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <Ionicons name="person-add" size={18} color="#fff" />
+                  <ProfessionalIcon name="person-add" size={18} color="#fff" />
                   <Text style={styles.connectButtonText}>Connect</Text>
                 </>
               )}
@@ -709,7 +710,7 @@ export default function ProfileScreen() {
           )}
           
           <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
-            <Ionicons name="chatbubble" size={18} color={Theme.colors.primary} />
+            <ProfessionalIcon name="chatbubble" size={18} color={Theme.colors.primary} />
             <Text style={styles.messageButtonText}>Message</Text>
           </TouchableOpacity>
         </View>
@@ -737,7 +738,7 @@ export default function ProfileScreen() {
             style={[styles.tab, activeTab === tab.id && styles.activeTab]}
             onPress={() => setActiveTab(tab.id)}
           >
-            <Ionicons 
+            <ProfessionalIcon 
               name={tab.icon as any} 
               size={18} 
               color={activeTab === tab.id ? Theme.colors.primary : Theme.colors.textSecondary} 
@@ -790,7 +791,7 @@ export default function ProfileScreen() {
       {/* Quick Stats Grid - FIXED */}
       <View style={styles.quickStatsGrid}>
         <View style={styles.quickStatCard}>
-          <Ionicons name="trophy" size={24} color={Theme.colors.accent} />
+          <ProfessionalIcon name="trophy" size={24} color={Theme.colors.accent} />
           <Text style={styles.quickStatValue}>
             {displayRank !== null ? `#${displayRank}` : '--'}
           </Text>
@@ -801,19 +802,19 @@ export default function ProfileScreen() {
         </View>
         
         <View style={styles.quickStatCard}>
-          <Ionicons name="fitness" size={24} color={Theme.colors.primary} />
+          <ProfessionalIcon name="fitness" size={24} color={Theme.colors.primary} />
           <Text style={styles.quickStatValue}>{assessmentStats?.total_assessments || 0}</Text>
           <Text style={styles.quickStatLabel}>Assessments</Text>
         </View>
         
         <View style={styles.quickStatCard}>
-          <Ionicons name="people" size={24} color={Theme.colors.secondary} />
+          <ProfessionalIcon name="people" size={24} color={Theme.colors.secondary} />
           <Text style={styles.quickStatValue}>{connectionStats.total}</Text>
           <Text style={styles.quickStatLabel}>Connections</Text>
         </View>
         
         <View style={styles.quickStatCard}>
-          <Ionicons name="star" size={24} color="#FFD700" />
+          <ProfessionalIcon name="star" size={24} color="#FFD700" />
           <Text style={styles.quickStatValue}>
             {assessmentStats?.average_score !== null ? `${Math.round(assessmentStats.average_score)}%` : '--'}
           </Text>
@@ -850,9 +851,9 @@ export default function ProfileScreen() {
               <View style={styles.recentPostMeta}>
                 <Text style={styles.recentPostDate}>{formatDate(post.created_at)}</Text>
                 <View style={styles.recentPostStats}>
-                  <Ionicons name="heart" size={12} color={Theme.colors.error} />
+                  <ProfessionalIcon name="heart" size={12} color={Theme.colors.error} />
                   <Text style={styles.recentPostStatText}>{post.likes_count}</Text>
-                  <Ionicons name="chatbubble" size={12} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="chatbubble" size={12} color={Theme.colors.textSecondary} />
                   <Text style={styles.recentPostStatText}>{post.comments_count}</Text>
                 </View>
               </View>
@@ -899,7 +900,7 @@ export default function ProfileScreen() {
         </>
       ) : (
         <View style={styles.emptyState}>
-          <Ionicons name="analytics-outline" size={64} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="analytics-outline" size={64} color={Theme.colors.textSecondary} />
           <Text style={styles.emptyStateTitle}>No Assessments Yet</Text>
           <Text style={styles.emptyStateText}>
             {isOwnProfile ? 'Complete AI assessments to track performance' : 'No assessments completed yet'}
@@ -934,11 +935,11 @@ export default function ProfileScreen() {
                 <Text style={styles.postDate}>{formatDate(post.created_at)}</Text>
                 <View style={styles.postStats}>
                   <View style={styles.postStat}>
-                    <Ionicons name="heart" size={16} color={Theme.colors.error} />
+                    <ProfessionalIcon name="heart" size={16} color={Theme.colors.error} />
                     <Text style={styles.postStatText}>{post.likes_count}</Text>
                   </View>
                   <View style={styles.postStat}>
-                    <Ionicons name="chatbubble-outline" size={16} color={Theme.colors.textSecondary} />
+                    <ProfessionalIcon name="chatbubble-outline" size={16} color={Theme.colors.textSecondary} />
                     <Text style={styles.postStatText}>{post.comments_count}</Text>
                   </View>
                 </View>
@@ -948,7 +949,7 @@ export default function ProfileScreen() {
         </>
       ) : (
         <View style={styles.emptyState}>
-          <Ionicons name="newspaper-outline" size={64} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="newspaper-outline" size={64} color={Theme.colors.textSecondary} />
           <Text style={styles.emptyStateTitle}>No Posts Yet</Text>
           <Text style={styles.emptyStateText}>
             {isOwnProfile ? 'Share your achievements!' : 'No posts shared yet'}
@@ -966,7 +967,7 @@ export default function ProfileScreen() {
       <React.Fragment key={label}>
         <View style={styles.infoRow}>
           <View style={styles.infoIconContainer}>
-            <Ionicons name={icon as any} size={20} color={Theme.colors.primary} />
+            <ProfessionalIcon name={icon as any} size={20} color={Theme.colors.primary} />
           </View>
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>{label}</Text>
@@ -1008,7 +1009,7 @@ export default function ProfileScreen() {
         <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Ionicons name="close" size={28} color={Theme.colors.text} />
+              <ProfessionalIcon name="close" size={28} color={Theme.colors.text} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Edit Profile</Text>
             <TouchableOpacity onPress={handleSave} disabled={saving}>
@@ -1019,7 +1020,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.imagePickerContainer} onPress={pickImage}>
             <Image source={{ uri: tempProfileImage || profileImage || 'https://via.placeholder.com/120' }} style={styles.modalProfileImage} />
             <View style={styles.cameraIconOverlay}>
-              <Ionicons name="camera" size={20} color="#fff" />
+              <ProfessionalIcon name="camera" size={20} color="#fff" />
             </View>
             <Text style={styles.changePhotoText}>Change Photo</Text>
           </TouchableOpacity>

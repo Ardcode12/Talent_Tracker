@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Theme } from '../constants/Theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -318,13 +318,13 @@ const handleSkip = async () => {
                 <Image source={{ uri: profileImage }} style={styles.profileImage} />
               ) : (
                 <View style={styles.imagePlaceholder}>
-                  <Ionicons name="camera" size={40} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="camera" size={40} color={Theme.colors.textSecondary} />
                   <Text style={styles.imagePlaceholderText}>Add Photo</Text>
                 </View>
               )}
               
               <View style={styles.editIconContainer}>
-                <Ionicons name="camera" size={20} color={Theme.colors.text} />
+                <ProfessionalIcon name="camera" size={20} color={Theme.colors.text} />
               </View>
             </TouchableOpacity>
             
@@ -351,7 +351,7 @@ const handleSkip = async () => {
                 maxLength={3}
                 editable={!loading}
               />
-              <Ionicons 
+              <ProfessionalIcon 
                 name="calendar-outline" 
                 size={20} 
                 color={Theme.colors.textSecondary} 
@@ -376,7 +376,7 @@ const handleSkip = async () => {
                 autoCapitalize="words"
                 editable={!loading}
               />
-              <Ionicons 
+              <ProfessionalIcon 
                 name="location-outline" 
                 size={20} 
                 color={Theme.colors.textSecondary} 
@@ -402,7 +402,7 @@ const handleSkip = async () => {
                 maxLength={5}
                 editable={!loading}
               />
-              <Ionicons name="resize-outline" size={20} color={Theme.colors.textSecondary} style={styles.inputIcon} />
+              <ProfessionalIcon name="resize-outline" size={20} color={Theme.colors.textSecondary} style={styles.inputIcon} />
             </View>
             <Text style={styles.inputHelper}>Used for accurate jump height measurement</Text>
           </View>
@@ -421,7 +421,7 @@ const handleSkip = async () => {
                 maxLength={5}
                 editable={!loading}
               />
-              <Ionicons name="barbell-outline" size={20} color={Theme.colors.textSecondary} style={styles.inputIcon} />
+              <ProfessionalIcon name="barbell-outline" size={20} color={Theme.colors.textSecondary} style={styles.inputIcon} />
             </View>
             <Text style={styles.inputHelper}>Used to calculate explosive power output</Text>
           </View>
@@ -476,7 +476,7 @@ const handleSkip = async () => {
               ) : (
                 <>
                   <Text style={styles.submitButtonText}>Complete Profile</Text>
-                  <Ionicons name="arrow-forward" size={20} color={Theme.colors.text} />
+                  <ProfessionalIcon name="arrow-forward" size={20} color={Theme.colors.text} />
                 </>
               )}
             </LinearGradient>
