@@ -1,7 +1,25 @@
 import os
 import cv2
 import numpy as np
-from deepface import DeepFace
+
+# Prevent deepface from loading FbDeepFace (uses LocallyConnected2D removed in TF2.x)
+os.environ.setdefault("DEEPFACE_HOME", "/tmp/.deepface")
+
+# Lazy import — only load deepface when actually needed to avoid import-time TF errors
+_DeepFace = None
+
+def _get_deepface():
+    """Import DeepFace lazily so server startup is not blocked if deepface has issues."""
+    global _DeepFace
+    if _DeepFace is None:
+        try:
+            from deepface import DeepFace as _df
+            _DeepFace = _df
+        except Exception as e:
+            print(f"[FaceVerify] deepface import failed: {e}")
+            return None
+    return _DeepFace
+
 
 def verify_face_in_video(video_path: str, profile_photo_path: str, seconds: int = 3) -> dict:
     """
@@ -16,6 +34,16 @@ def verify_face_in_video(video_path: str, profile_photo_path: str, seconds: int 
             "reason": str               # Explanation of result
         }
     """
+    # Try to get DeepFace — skip gracefully if unavailable
+    DeepFace = _get_deepface()
+    if DeepFace is None:
+        return {
+            "verified": None,
+            "confidence": 0.0,
+            "face_found_in_video": False,
+            "reason": "Face verification module unavailable. Skipping check."
+        }
+
     if not profile_photo_path or not os.path.exists(profile_photo_path):
         return {
             "verified": None,
@@ -35,11 +63,11 @@ def verify_face_in_video(video_path: str, profile_photo_path: str, seconds: int 
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
+
     # Sample up to 20 frames spread evenly across the ENTIRE video
     num_samples = 20
     step = max(1, total_frames // num_samples)
-    
+
     frames = []
     for count in range(0, total_frames, step):
         cap.set(cv2.CAP_PROP_POS_FRAMES, count)
@@ -65,20 +93,16 @@ def verify_face_in_video(video_path: str, profile_photo_path: str, seconds: int 
     print(f"[FaceVerify] Scanning {len(frames)} frames for a face...")
     for frame in frames:
         try:
-            # Enforce face detection to ensure we actually crop a face
             faces = DeepFace.extract_faces(
-                img_path=frame, 
-                detector_backend="opencv", # Fast and lightweight
+                img_path=frame,
+                detector_backend="opencv",  # Fast and lightweight; no LocallyConnected2D
                 enforce_detection=True
             )
             if faces:
-                # We take the first detected face in the frame
                 face_obj = faces[0]
                 conf = face_obj.get("confidence", 0.0)
                 if conf > best_face_confidence:
                     best_face_confidence = conf
-                    # DeepFace returns face in RGB, normalized. 
-                    # We can use the raw frame for verification later to be safe.
                     best_face_img = frame
         except ValueError:
             # DeepFace raises ValueError if no face is found when enforce_detection=True
@@ -89,30 +113,28 @@ def verify_face_in_video(video_path: str, profile_photo_path: str, seconds: int 
 
     if best_face_img is None:
         return {
-            "verified": False, # Treat as failed if we required them to show their face
+            "verified": False,
             "confidence": 0.0,
             "face_found_in_video": False,
             "reason": "No face detected in the video. Please ensure your face is clearly visible during the recording."
         }
 
-    # Now verify the best found face against the profile photo
+    # Verify the best found face against the profile photo
     try:
         print("[FaceVerify] Face found in video. Verifying against profile photo...")
-        # DeepFace.verify takes BGR numpy arrays or paths
         result = DeepFace.verify(
             img1_path=best_face_img,
             img2_path=profile_photo_path,
-            model_name="Facenet512",  # Stricter & more accurate than VGG-Face
+            model_name="Facenet512",      # Accurate and TF2-compatible (no LocallyConnected2D)
             detector_backend="opencv",
             enforce_detection=True
         )
-        
+
         is_verified = result.get("verified", False)
-        # Convert distance to a pseudo-confidence score (lower distance = higher confidence)
         distance = result.get("distance", 1.0)
         threshold = result.get("threshold", 0.4)
-        
-        # Simple confidence metric: 1.0 means identical, 0.0 means completely different
+
+        # Simple confidence metric: 1.0 = identical, 0.0 = completely different
         confidence = max(0.0, 1.0 - (distance / (threshold * 2)))
 
         if is_verified:
@@ -138,4 +160,3 @@ def verify_face_in_video(video_path: str, profile_photo_path: str, seconds: int 
             "face_found_in_video": True,
             "reason": "Error during face verification comparison."
         }
-
