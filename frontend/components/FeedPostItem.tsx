@@ -9,7 +9,7 @@ import {
   Easing,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import { Theme } from '../constants/Theme';
 import { GlassmorphicCard } from './GlassmorphicCard';
 import { AnimatedGradient } from './AnimatedGradient';
@@ -148,7 +148,7 @@ export const FeedPostItem: React.FC<FeedPostItemProps> = ({ item, index }) => {
           </View>
           
           <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
         
@@ -160,7 +160,7 @@ export const FeedPostItem: React.FC<FeedPostItemProps> = ({ item, index }) => {
               colors={[Theme.colors.success, Theme.colors.secondary]}
               style={styles.aiVerifiedBadge}
             >
-              <Ionicons name="shield-checkmark" size={16} color={Theme.colors.text} />
+              <ProfessionalIcon name="shield-checkmark" size={16} color={Theme.colors.text} />
               <Text style={styles.aiVerifiedText}>AI Verified Performance</Text>
               <View style={styles.verifiedGlow} />
             </AnimatedGradient>
@@ -174,7 +174,7 @@ export const FeedPostItem: React.FC<FeedPostItemProps> = ({ item, index }) => {
               style={styles.mediaGradient}
             >
               <View style={styles.playButtonContainer}>
-                <Ionicons name="play" size={32} color={Theme.colors.text} />
+                <ProfessionalIcon name="play" size={32} color={Theme.colors.text} />
               </View>
             </AnimatedGradient>
             <View style={styles.mediaDuration}>
@@ -189,7 +189,7 @@ export const FeedPostItem: React.FC<FeedPostItemProps> = ({ item, index }) => {
             onPress={handleLike}
           >
             <Animated.View style={{ transform: [{ scale: likeScale }] }}>
-              <Ionicons 
+              <ProfessionalIcon 
                 name={liked ? "heart" : "heart-outline"} 
                 size={24} 
                 color={liked ? Theme.colors.error : Theme.colors.text} 
@@ -204,17 +204,17 @@ export const FeedPostItem: React.FC<FeedPostItemProps> = ({ item, index }) => {
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.engagementButton}>
-            <Ionicons name="chatbubble-outline" size={22} color={Theme.colors.text} />
+            <ProfessionalIcon name="chatbubble-outline" size={22} color={Theme.colors.text} />
             <Text style={styles.engagementCount}>{item.engagement.comments}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.engagementButton}>
-            <Ionicons name="share-social-outline" size={22} color={Theme.colors.text} />
+            <ProfessionalIcon name="share-social-outline" size={22} color={Theme.colors.text} />
             <Text style={styles.engagementCount}>{item.engagement.shares}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.engagementButton}>
-            <Ionicons name="bookmark-outline" size={22} color={Theme.colors.text} />
+            <ProfessionalIcon name="bookmark-outline" size={22} color={Theme.colors.text} />
           </TouchableOpacity>
         </View>
       </GlassmorphicCard>

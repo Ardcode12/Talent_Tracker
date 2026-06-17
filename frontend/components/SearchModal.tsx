@@ -13,7 +13,7 @@ import {
   Keyboard,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import { Theme } from '../constants/Theme';
 import { search, getSearchSuggestions } from '../services/api';
 import { useDebouncedCallback } from '../hooks/useDebounce';
@@ -100,7 +100,7 @@ export default function SearchModal({ visible, onClose, navigation }: SearchModa
         <View style={styles.resultHeader}>
           <Text style={styles.resultName}>{item.name}</Text>
           {item.is_verified && (
-            <Ionicons name="checkmark-circle" size={16} color={Theme.colors.primary} />
+            <ProfessionalIcon name="checkmark-circle" size={16} color={Theme.colors.primary} />
           )}
         </View>
         <Text style={styles.resultMeta}>
@@ -131,7 +131,7 @@ export default function SearchModal({ visible, onClose, navigation }: SearchModa
         <View style={styles.resultHeader}>
           <Text style={styles.resultName}>{item.name}</Text>
           {item.is_verified && (
-            <Ionicons name="checkmark-circle" size={16} color={Theme.colors.primary} />
+            <ProfessionalIcon name="checkmark-circle" size={16} color={Theme.colors.primary} />
           )}
         </View>
         <Text style={styles.resultMeta}>
@@ -156,7 +156,7 @@ export default function SearchModal({ visible, onClose, navigation }: SearchModa
         />
       ) : (
         <View style={[styles.postThumbnail, styles.noMedia]}>
-          <Ionicons name="document-text" size={24} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="document-text" size={24} color={Theme.colors.textSecondary} />
         </View>
       )}
       <View style={styles.resultInfo}>
@@ -180,7 +180,7 @@ export default function SearchModal({ visible, onClose, navigation }: SearchModa
       style={styles.suggestionItem}
       onPress={() => setQuery(item.text)}
     >
-      <Ionicons 
+      <ProfessionalIcon 
         name={item.type === 'athlete' ? 'person' : 'football'} 
         size={16} 
         color={Theme.colors.textSecondary} 
@@ -210,11 +210,11 @@ export default function SearchModal({ visible, onClose, navigation }: SearchModa
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={Theme.colors.text} />
+            <ProfessionalIcon name="arrow-back" size={24} color={Theme.colors.text} />
           </TouchableOpacity>
           
           <View style={styles.searchInputContainer}>
-            <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="search" size={20} color={Theme.colors.textSecondary} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search athletes, coaches, posts..."
@@ -226,7 +226,7 @@ export default function SearchModal({ visible, onClose, navigation }: SearchModa
             />
             {query.length > 0 && (
               <TouchableOpacity onPress={() => setQuery('')}>
-                <Ionicons name="close-circle" size={20} color={Theme.colors.textSecondary} />
+                <ProfessionalIcon name="close-circle" size={20} color={Theme.colors.textSecondary} />
               </TouchableOpacity>
             )}
           </View>
@@ -270,7 +270,7 @@ export default function SearchModal({ visible, onClose, navigation }: SearchModa
           />
         ) : !hasResults ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="search" size={48} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="search" size={48} color={Theme.colors.textSecondary} />
             <Text style={styles.emptyText}>No results found for "{query}"</Text>
             <Text style={styles.emptySubtext}>Try different keywords</Text>
           </View>

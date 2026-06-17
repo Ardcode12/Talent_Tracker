@@ -1,4 +1,3 @@
-// frontend/screens/LoginScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -33,10 +32,12 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { BlurView } from 'expo-blur';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Theme } from '../constants/Theme';
+import * as DocumentPicker from 'expo-document-picker';
 
 const { width, height } = Dimensions.get("window");
 
@@ -67,6 +68,9 @@ const LoginScreen = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<any>({});
+  // Coach certificate
+  const [certificate, setCertificate] = useState<any>(null);
+  const [pendingApproval, setPendingApproval] = useState(false);
 
   // Animation values
   const tabPosition = useSharedValue(0);
@@ -119,6 +123,7 @@ const LoginScreen = () => {
       experience: "",
     });
     setErrors({});
+    setCertificate(null);
   };
 
   // Validation
@@ -141,20 +146,17 @@ const LoginScreen = () => {
       if (!formData.name.trim()) {
         newErrors.name = "Name is required";
       }
-      if (!formData.phone.trim()) {
-        newErrors.phone = "Phone number is required";
-      } else if (!/^\d{10}$/.test(formData.phone)) {
-        newErrors.phone = "Phone number must be 10 digits";
-      }
-      
       if (!formData.sport.trim()) {
-        newErrors.sport = userType === "athlete" 
-          ? "Sport is required" 
+        newErrors.sport = userType === "athlete"
+          ? "Sport is required"
           : "Specialization is required";
       }
-      
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = "Passwords do not match";
+      }
+      // Coach must upload certificate
+      if (userType === 'coach' && !certificate) {
+        newErrors.certificate = "Please upload your coaching certificate";
       }
     }
 
@@ -178,19 +180,18 @@ const LoginScreen = () => {
 
     try {
       let response;
-      
+
       if (isLogin) {
         // LOGIN FLOW
         response = await ApiService.login(formData.email, formData.password);
-        
+
         if (response && response.token) {
-          // ✅ ROLE VALIDATION
           const userRole = response.user.role;
-          
+
           if (userRole !== userType) {
             Alert.alert(
               "Wrong Portal",
-              userRole === 'coach' 
+              userRole === 'coach'
                 ? "You are registered as a Coach.\nPlease switch to the Coach tab to login."
                 : "You are registered as an Athlete.\nPlease switch to the Athlete tab to login.",
               [{ text: "OK" }]
@@ -199,65 +200,71 @@ const LoginScreen = () => {
             return;
           }
 
-          // Save login data
           await AsyncStorage.setItem('authToken', response.token);
           await AsyncStorage.setItem('userData', JSON.stringify(response.user));
           await AsyncStorage.setItem('isLoggedIn', 'true');
           await AsyncStorage.setItem('userRole', response.user.role);
-          
-          // Check profile completion
+
           const isProfileComplete = checkProfileCompletion(response.user);
           const profileCompletedFlag = await AsyncStorage.getItem('profileCompleted');
           const userSpecificFlag = await AsyncStorage.getItem(`profile_completed_${response.user.id}`);
-          
+
           if (isProfileComplete || profileCompletedFlag === 'true' || userSpecificFlag === 'true' || profileCompletedFlag === 'skipped') {
             await AsyncStorage.setItem('profileCompleted', 'true');
-            
             if (response.user.role === 'coach') {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'CoachMain' }],
-              });
+              navigation.reset({ index: 0, routes: [{ name: 'CoachMain' }] });
             } else {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Main' }],
-              });
+              navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
             }
           } else {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'ProfileCompletion' }],
-            });
+            navigation.reset({ index: 0, routes: [{ name: 'ProfileCompletion' }] });
           }
         }
       } else {
         // SIGNUP FLOW
-        const signupData = {
-          email: formData.email,
-          password: formData.password,
-          name: formData.name,
-          phone: formData.phone,
-          role: userType,
-          sport: formData.sport,
-          experience: userType === 'coach' && formData.experience 
-            ? parseInt(formData.experience, 10) 
-            : null,
-          specialization: userType === 'coach' ? formData.sport : null
-        };
-        
-        response = await ApiService.signup(signupData);
-        
-        if (response && response.token) {
-          await AsyncStorage.setItem('authToken', response.token);
-          await AsyncStorage.setItem('userData', JSON.stringify(response.user));
-          await AsyncStorage.setItem('isLoggedIn', 'true');
-          await AsyncStorage.setItem('userRole', response.user.role);
-          
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'ProfileCompletion' }],
+        if (userType === 'coach') {
+          // Coach signup with certificate
+          const formPayload = new FormData();
+          formPayload.append('name', formData.name);
+          formPayload.append('email', formData.email);
+          formPayload.append('password', formData.password);
+          formPayload.append('sport', formData.sport);
+          if (formData.experience) formPayload.append('experience', formData.experience);
+          formPayload.append('specialization', formData.sport);
+          if (certificate) {
+            formPayload.append('certificate', {
+              uri: certificate.uri,
+              name: certificate.name,
+              type: certificate.mimeType || 'application/pdf',
+            } as any);
+          }
+          const BASE_URL = ApiService.getBaseUrl ? ApiService.getBaseUrl() : 'http://192.168.1.x:8000';
+          const res = await fetch(`${BASE_URL}/api/auth/register-coach`, {
+            method: 'POST',
+            body: formPayload,
+            headers: { 'Content-Type': 'multipart/form-data' },
           });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || 'Registration failed');
+          setPendingApproval(true);
+        } else {
+          // Athlete signup
+          const signupData = {
+            email: formData.email,
+            password: formData.password,
+            name: formData.name,
+            phone: formData.phone,
+            role: userType,
+            sport: formData.sport,
+          };
+          response = await ApiService.signup(signupData);
+          if (response && response.token) {
+            await AsyncStorage.setItem('authToken', response.token);
+            await AsyncStorage.setItem('userData', JSON.stringify(response.user));
+            await AsyncStorage.setItem('isLoggedIn', 'true');
+            await AsyncStorage.setItem('userRole', response.user.role);
+            navigation.reset({ index: 0, routes: [{ name: 'ProfileCompletion' }] });
+          }
         }
       }
     } catch (error: any) {
@@ -265,6 +272,21 @@ const LoginScreen = () => {
       Alert.alert("Error", error.message || "Something went wrong. Try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const pickCertificate = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled && result.assets?.length > 0) {
+        setCertificate(result.assets[0]);
+        setErrors((prev: any) => ({ ...prev, certificate: '' }));
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Could not pick file');
     }
   };
 
@@ -297,7 +319,7 @@ const LoginScreen = () => {
         styles.inputContainer,
         errors[field] && styles.inputError,
       ]}>
-        <Ionicons 
+        <ProfessionalIcon 
           name={icon as any} 
           size={20} 
           color={Theme.colors.textSecondary} 
@@ -319,7 +341,7 @@ const LoginScreen = () => {
             onPress={() => setShowPassword(!showPassword)}
             style={styles.eyeButton}
           >
-            <Ionicons 
+            <ProfessionalIcon 
               name={showPassword ? "eye" : "eye-off"} 
               size={20} 
               color={Theme.colors.textSecondary} 
@@ -341,7 +363,50 @@ const LoginScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Theme.colors.background} />
-      
+
+      {/* Pending Approval Screen */}
+      {pendingApproval && (
+        <View style={styles.pendingContainer}>
+          <LinearGradient
+            colors={[Theme.colors.background, '#1a1f35']}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
+          <View style={styles.pendingCard}>
+            <View style={styles.pendingIconBg}>
+              <ProfessionalIcon name="time-outline" size={48} color="#FFB300" />
+            </View>
+            <Text style={styles.pendingTitle}>Verification Pending</Text>
+            <Text style={styles.pendingText}>
+              Your coaching certificate has been submitted and is being reviewed.
+              {"\n\n"}You will be able to log in once your credentials are approved.
+              {"\n\n"}This usually takes a few minutes.
+            </Text>
+            <View style={styles.pendingSteps}>
+              <View style={styles.pendingStep}>
+                <ProfessionalIcon name="checkmark-circle" size={18} color="#22c55e" />
+                <Text style={styles.pendingStepText}>Account created</Text>
+              </View>
+              <View style={styles.pendingStep}>
+                <ProfessionalIcon name="sync" size={18} color="#FFB300" />
+                <Text style={styles.pendingStepText}>Certificate being verified…</Text>
+              </View>
+              <View style={styles.pendingStep}>
+                <ProfessionalIcon name="lock-closed-outline" size={18} color={Theme.colors.textSecondary} />
+                <Text style={[styles.pendingStepText, { color: Theme.colors.textSecondary }]}>Account activation</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.pendingBackBtn}
+              onPress={() => setPendingApproval(false)}
+            >
+              <Text style={styles.pendingBackText}>Back to Login</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Background Gradient */}
       <LinearGradient
         colors={[Theme.colors.background, '#1a1f35', Theme.colors.background]}
@@ -524,6 +589,40 @@ const LoginScreen = () => {
                 { keyboardType: 'numeric' }
               )}
 
+              {/* Certificate Upload - Coach Signup only */}
+              {!isLogin && userType === 'coach' && (
+                <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.inputWrapper}>
+                  <TouchableOpacity
+                    style={[
+                      styles.certUploadBtn,
+                      certificate && styles.certUploadBtnSuccess,
+                      errors.certificate && styles.certUploadBtnError,
+                    ]}
+                    onPress={pickCertificate}
+                    activeOpacity={0.8}
+                  >
+                    <ProfessionalIcon
+                      name={certificate ? 'document-text' : 'cloud-upload-outline'}
+                      size={20}
+                      color={certificate ? '#22c55e' : errors.certificate ? '#ef4444' : Theme.colors.textSecondary}
+                    />
+                    <Text style={[
+                      styles.certUploadText,
+                      certificate && { color: '#22c55e' },
+                      errors.certificate && { color: '#ef4444' },
+                    ]}>
+                      {certificate ? `✓ ${certificate.name}` : 'Upload Coaching Certificate (PDF / Image)'}
+                    </Text>
+                  </TouchableOpacity>
+                  {errors.certificate && (
+                    <Text style={styles.errorText}>{errors.certificate}</Text>
+                  )}
+                  <Text style={styles.certHint}>
+                    Upload your NIS / SAI / sports authority certificate
+                  </Text>
+                </Animated.View>
+              )}
+
               {/* Password */}
               {renderInput(
                 "lock-closed-outline",
@@ -570,7 +669,7 @@ const LoginScreen = () => {
                     <Text style={styles.submitButtonText}>
                       {isLogin ? "Sign In" : "Create Account"}
                     </Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    <ProfessionalIcon name="arrow-forward" size={20} color="#fff" />
                   </>
                 )}
               </LinearGradient>
@@ -601,19 +700,19 @@ const LoginScreen = () => {
             {/* Social Login */}
             <View style={styles.socialContainer}>
               <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-google" size={22} color={Theme.colors.text} />
+                <ProfessionalIcon name="logo-google" size={22} color={Theme.colors.text} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-apple" size={22} color={Theme.colors.text} />
+                <ProfessionalIcon name="logo-apple" size={22} color={Theme.colors.text} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-facebook" size={22} color={Theme.colors.text} />
+                <ProfessionalIcon name="logo-facebook" size={22} color={Theme.colors.text} />
               </TouchableOpacity>
             </View>
 
             {/* Info Section */}
             <View style={styles.infoContainer}>
-              <Ionicons name="information-circle-outline" size={16} color={Theme.colors.textSecondary} />
+              <ProfessionalIcon name="information-circle-outline" size={16} color={Theme.colors.textSecondary} />
               <Text style={styles.infoText}>
                 {userType === 'athlete' 
                   ? "Athletes can track performance, connect with coaches, and showcase talent."
@@ -963,6 +1062,59 @@ const styles = StyleSheet.create({
     color: Theme.colors.primary,
     fontWeight: '600',
   },
+
+  // Certificate upload
+  certUploadBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)', borderStyle: 'dashed',
+    borderRadius: Theme.borderRadius.lg, padding: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  certUploadBtnSuccess: {
+    borderColor: '#22c55e', borderStyle: 'solid', backgroundColor: '#22c55e10',
+  },
+  certUploadBtnError: {
+    borderColor: '#ef4444', borderStyle: 'solid',
+  },
+  certUploadText: {
+    flex: 1, fontSize: 14, color: Theme.colors.textSecondary,
+  },
+  certHint: {
+    fontSize: 11, color: Theme.colors.textSecondary, marginTop: 5, marginLeft: 2,
+  },
+
+  // Pending approval screen
+  pendingContainer: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 100, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: Theme.colors.background,
+  },
+  pendingCard: {
+    marginHorizontal: 24, padding: 32, borderRadius: 24,
+    backgroundColor: Theme.colors.elevated,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  pendingIconBg: {
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: '#FFB30020', justifyContent: 'center', alignItems: 'center',
+    marginBottom: 20,
+  },
+  pendingTitle: {
+    fontSize: 24, fontWeight: '800', color: Theme.colors.text, marginBottom: 12,
+  },
+  pendingText: {
+    fontSize: 14, color: Theme.colors.textSecondary, textAlign: 'center',
+    lineHeight: 20, marginBottom: 24,
+  },
+  pendingSteps: { width: '100%', gap: 12, marginBottom: 28 },
+  pendingStep: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pendingStepText: { fontSize: 14, color: Theme.colors.text, fontWeight: '600' },
+  pendingBackBtn: {
+    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14,
+    paddingHorizontal: 28, paddingVertical: 12,
+  },
+  pendingBackText: { color: Theme.colors.primary, fontWeight: '700', fontSize: 15 },
 });
 
 export default LoginScreen;

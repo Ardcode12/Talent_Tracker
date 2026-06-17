@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
@@ -155,14 +155,14 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               {selectedTest?.name || 'Upload Performance Video'}
             </Text>
             <TouchableOpacity onPress={resetModal}>
-              <Ionicons name="close" size={24} color={Theme.colors.text} />
+              <ProfessionalIcon name="close" size={24} color={Theme.colors.text} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalBody}>
             {isAnalyzing ? (
               <View style={styles.analyzingContainer}>
-                <Ionicons name="analytics" size={64} color={Theme.colors.primary} />
+                <ProfessionalIcon name="analytics" size={64} color={Theme.colors.primary} />
                 <Text style={styles.analyzingText}>Analyzing your performance...</Text>
                 
                 <View style={styles.progressContainer}>
@@ -214,7 +214,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                   style={styles.optionCard}
                   onPress={recordVideo}
                 >
-                  <Ionicons name="videocam" size={40} color={Theme.colors.primary} />
+                  <ProfessionalIcon name="videocam" size={40} color={Theme.colors.primary} />
                   <Text style={styles.optionTitle}>Record Video</Text>
                   <Text style={styles.optionSubtitle}>Use camera to record</Text>
                 </TouchableOpacity>
@@ -223,7 +223,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                   style={styles.optionCard}
                   onPress={pickVideoFromGallery}
                 >
-                  <Ionicons name="folder-open" size={40} color={Theme.colors.secondary} />
+                  <ProfessionalIcon name="folder-open" size={40} color={Theme.colors.secondary} />
                   <Text style={styles.optionTitle}>Choose from Gallery</Text>
                   <Text style={styles.optionSubtitle}>Select existing video</Text>
                 </TouchableOpacity>

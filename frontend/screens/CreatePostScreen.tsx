@@ -13,7 +13,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { Theme } from '../constants/Theme';
 import { createPost } from '../services/api'; // ADD THIS IMPORT
 import * as ImagePicker from 'expo-image-picker'; // ADD THIS IF YOU WANT IMAGE SUPPORT
@@ -99,7 +99,7 @@ export default function CreatePostScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Theme.colors.text} />
+          <ProfessionalIcon name="arrow-back" size={24} color={Theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Post</Text>
         <TouchableOpacity 
@@ -134,7 +134,7 @@ export default function CreatePostScreen({ navigation }) {
               style={styles.removeImageButton} 
               onPress={removeImage}
             >
-              <Ionicons name="close-circle" size={24} color={Theme.colors.error} />
+              <ProfessionalIcon name="close-circle" size={24} color={Theme.colors.error} />
             </TouchableOpacity>
           </View>
         )}
@@ -145,7 +145,7 @@ export default function CreatePostScreen({ navigation }) {
             onPress={pickImage}
             disabled={isPosting}
           >
-            <Ionicons name="image" size={24} color={Theme.colors.primary} />
+            <ProfessionalIcon name="image" size={24} color={Theme.colors.primary} />
             <Text style={styles.mediaButtonText}>Photo</Text>
           </TouchableOpacity>
           
@@ -153,7 +153,7 @@ export default function CreatePostScreen({ navigation }) {
             style={[styles.mediaButton, styles.mediaButtonDisabled]} 
             disabled={true}
           >
-            <Ionicons name="videocam" size={24} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="videocam" size={24} color={Theme.colors.textSecondary} />
             <Text style={[styles.mediaButtonText, { color: Theme.colors.textSecondary }]}>
               Video (Coming Soon)
             </Text>

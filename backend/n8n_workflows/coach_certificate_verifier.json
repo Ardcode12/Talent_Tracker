@@ -1,0 +1,163 @@
+{
+  "name": "TalentTracker - Coach Certificate Verifier",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "coach-certificate-verify",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Receive from Backend",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "talent-tracker-coach-verify"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "user_id",
+              "value": "={{ $json.body.user_id }}"
+            },
+            {
+              "name": "name",
+              "value": "={{ $json.body.name }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $json.body.email }}"
+            },
+            {
+              "name": "sport",
+              "value": "={{ $json.body.sport }}"
+            },
+            {
+              "name": "ocr_text",
+              "value": "={{ $json.body.ocr_text }}"
+            },
+            {
+              "name": "certificate_url",
+              "value": "={{ $json.body.certificate_url }}"
+            },
+            {
+              "name": "backend_webhook",
+              "value": "={{ $json.body.backend_webhook }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-fields",
+      "name": "Set Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.OPENAI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": \"gpt-4o-mini\",\n  \"max_tokens\": 200,\n  \"temperature\": 0,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a sports credential verification specialist for India. Your job is to determine if a coaching certificate is legitimate. Analyse the OCR text extracted from a certificate and decide if it is from a recognised sports authority (SAI, NIS Patiala, NSNIS, IOA, BCCI, AIFF, Hockey India, Athletics Federation of India, or any other Indian state sports authority, or internationally recognised bodies like FIFA, FIBA, World Athletics, BWF, ITF, ICC, etc.). Reply ONLY with a valid JSON object in this exact format: {\\\"decision\\\": \\\"approved\\\" or \\\"rejected\\\", \\\"confidence\\\": 0.0 to 1.0, \\\"reason\\\": \\\"one sentence explanation\\\"}. Do not include any other text.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Coach Name: \" + $('Set Fields').item.json.name + \"\\nSport: \" + $('Set Fields').item.json.sport + \"\\n\\nCertificate OCR Text:\\n\" + $('Set Fields').item.json.ocr_text\n    }\n  ]\n}) }}",
+        "options": {}
+      },
+      "id": "openai-analysis",
+      "name": "AI - Analyze Certificate (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the AI response\nconst aiResponse = $input.item.json;\nlet aiText = '';\ntry {\n  aiText = aiResponse.choices[0].message.content.trim();\n} catch(e) {\n  // Fallback if OpenAI call fails\n  return [{\n    json: {\n      user_id: $('Set Fields').item.json.user_id,\n      backend_webhook: $('Set Fields').item.json.backend_webhook,\n      decision: 'pending',\n      confidence: 0.5,\n      reason: 'AI analysis failed - requires manual review',\n      name: $('Set Fields').item.json.name,\n      email: $('Set Fields').item.json.email,\n    }\n  }];\n}\n\n// Parse the JSON from AI\nlet parsed = {};\ntry {\n  // Extract JSON from response (in case AI adds extra text)\n  const jsonMatch = aiText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    parsed = JSON.parse(jsonMatch[0]);\n  } else {\n    parsed = { decision: 'rejected', confidence: 0.1, reason: 'Could not parse AI response' };\n  }\n} catch(e) {\n  parsed = { decision: 'rejected', confidence: 0.1, reason: 'AI response parsing error' };\n}\n\n// Clamp confidence to 0-1\nconst confidence = Math.min(1.0, Math.max(0.0, parsed.confidence || 0.5));\n\n// Threshold: approve if confidence >= 0.6\nconst decision = (confidence >= 0.6 && parsed.decision === 'approved') ? 'approved' : 'rejected';\n\nreturn [{\n  json: {\n    user_id: $('Set Fields').item.json.user_id,\n    backend_webhook: $('Set Fields').item.json.backend_webhook,\n    name: $('Set Fields').item.json.name,\n    email: $('Set Fields').item.json.email,\n    decision: decision,\n    confidence: confidence,\n    reason: parsed.reason || 'Verified by AI',\n    raw_ai_response: aiText,\n  }\n}];"
+      },
+      "id": "parse-ai-response",
+      "name": "Parse AI Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.backend_webhook }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "jsonBody": "={{ JSON.stringify({\n  \"user_id\": parseInt($json.user_id),\n  \"decision\": $json.decision,\n  \"reason\": \"[AI: \" + ($json.confidence * 100).toFixed(0) + \"% confidence] \" + $json.reason\n}) }}",
+        "options": {}
+      },
+      "id": "notify-backend",
+      "name": "Notify Backend (Decision)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"processed\", \"decision\": \"{{ $('Parse AI Decision').item.json.decision }}\" }",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Receive from Backend": {
+      "main": [
+        [{ "node": "Set Fields", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set Fields": {
+      "main": [
+        [{ "node": "AI - Analyze Certificate (OpenAI)", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI - Analyze Certificate (OpenAI)": {
+      "main": [
+        [{ "node": "Parse AI Decision", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse AI Decision": {
+      "main": [
+        [{ "node": "Notify Backend (Decision)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notify Backend (Decision)": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["TalentTracker", "AI", "Certificate"],
+  "meta": {
+    "description": "Receives coach certificate OCR text from TalentTracker backend, sends to OpenAI GPT-4o-mini for analysis, then calls the backend webhook with approve/reject decision."
+  }
+}

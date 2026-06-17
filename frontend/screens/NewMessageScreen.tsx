@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { Theme } from '../constants/Theme';
 import ApiService, { startConversation, getImageUrl } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -158,14 +158,14 @@ export default function NewMessageScreen({ navigation }) {
       {starting === item.id ? (
         <ActivityIndicator size="small" color={Theme.colors.primary} />
       ) : (
-        <Ionicons name="chatbubble-outline" size={22} color={Theme.colors.primary} />
+        <ProfessionalIcon name="chatbubble-outline" size={22} color={Theme.colors.primary} />
       )}
     </TouchableOpacity>
   );
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="people-outline" size={60} color={Theme.colors.textSecondary} />
+      <ProfessionalIcon name="people-outline" size={60} color={Theme.colors.textSecondary} />
       <Text style={styles.emptyText}>No connections found</Text>
       <Text style={styles.emptySubtext}>
         {searchQuery 
@@ -188,7 +188,7 @@ export default function NewMessageScreen({ navigation }) {
     <View style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
+        <ProfessionalIcon name="search" size={20} color={Theme.colors.textSecondary} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name, sport, or location..."
@@ -199,14 +199,14 @@ export default function NewMessageScreen({ navigation }) {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="close-circle" size={20} color={Theme.colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
 
       {/* Info Banner */}
       <View style={styles.infoBanner}>
-        <Ionicons name="information-circle" size={18} color={Theme.colors.primary} />
+        <ProfessionalIcon name="information-circle" size={18} color={Theme.colors.primary} />
         <Text style={styles.infoBannerText}>
           You can message users you're connected with
         </Text>

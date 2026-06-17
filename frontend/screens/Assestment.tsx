@@ -16,8 +16,10 @@ import {
   RefreshControl,
   AppState,
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -52,9 +54,10 @@ const ASSESSMENT_TESTS = [
     id: 'shuttle_run',
     name: 'Shuttle Run', 
     icon: 'directions-run', 
-    color: '#FF6B6B', 
+    accentColor: Theme.colors.primary,
     unit: 'seconds', 
-    description: 'Test your agility and speed',
+    description: 'Agility & Speed',
+    tag: 'Cardio',
     instructions: [
       'Record from a **straight angle** covering the entire **10m track**.',
       'A **10-meter** running distance is **compulsory**.',
@@ -63,12 +66,13 @@ const ASSESSMENT_TESTS = [
     ]
   },
   { 
-    id: 'vertical_jump', // ✅ Changed from vertical_jump
+    id: 'vertical_jump',
     name: 'Vertical Jump', 
     icon: 'trending-up', 
-    color: '#4ECDC4', 
+    accentColor: Theme.colors.secondary,
     unit: 'cm', 
-    description: 'Measure explosive power',
+    description: 'Explosive Power',
+    tag: 'Strength',
     instructions: [
       'Record from a **side-on angle**.',
       'Ensure your **full body (head to feet)** is visible throughout the jump.',
@@ -80,9 +84,10 @@ const ASSESSMENT_TESTS = [
     id: 'squats',
     name: 'Squats', 
     icon: 'fitness-center', 
-    color: '#45B7D1', 
+    accentColor: Theme.colors.accent,
     unit: 'reps', 
-    description: 'Test lower body strength',
+    description: 'Lower Body Strength',
+    tag: 'Endurance',
     instructions: [
       'Record from a **side-on angle**.',
       'Perform as many **continuous reps** as possible.',
@@ -94,9 +99,10 @@ const ASSESSMENT_TESTS = [
     id: 'height_detection',
     name: 'Sit Ups', 
     icon: 'self-improvement', 
-    color: '#F7DC6F', 
-    unit: 'cm', 
-    description: 'Test Core Strength',
+    accentColor: '#8B5CF6',
+    unit: 'reps', 
+    description: 'Core Strength',
+    tag: 'Core',
     instructions: [
       'Record from a **side-on angle**.',
       'Ensure your **full body is visible**.',
@@ -120,6 +126,7 @@ const renderInstructionText = (text: string) => {
 };
 
 export default function AssessmentScreen() {
+  const insets = useSafeAreaInsets();
   const [selectedTest, setSelectedTest] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [modalStep, setModalStep] = useState(1);
@@ -348,7 +355,7 @@ export default function AssessmentScreen() {
   };
 
   const renderHeader = () => (
-  <View style={styles.header}>
+  <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
     <Text style={styles.headerTitle}>AI Assessments</Text>
     <Text style={styles.headerSubtitle}>Track Your Athletic Performance</Text>
     {stats ? (
@@ -356,7 +363,7 @@ export default function AssessmentScreen() {
         <View style={styles.statCardWrapper}>
           <LinearGradient colors={['rgba(30,136,229,0.25)', 'rgba(21,101,192,0.08)']} style={styles.statCard}>
             <View style={[styles.statIconCircle, { backgroundColor: 'rgba(30,136,229,0.3)' }]}>
-              <Ionicons name="clipboard-outline" size={18} color="#1E88E5" />
+              <ProfessionalIcon name="clipboard-outline" size={18} color="#1E88E5" />
             </View>
             <Text style={[styles.statValue, { color: '#60A5FA' }]}>{stats.total_assessments || 0}</Text>
           </LinearGradient>
@@ -365,7 +372,7 @@ export default function AssessmentScreen() {
         <View style={styles.statCardWrapper}>
           <LinearGradient colors={['rgba(94,53,177,0.25)', 'rgba(69,39,160,0.08)']} style={styles.statCard}>
             <View style={[styles.statIconCircle, { backgroundColor: 'rgba(94,53,177,0.3)' }]}>
-              <Ionicons name="analytics-outline" size={18} color="#5E35B1" />
+              <ProfessionalIcon name="analytics-outline" size={18} color="#5E35B1" />
             </View>
             <Text style={[styles.statValue, { color: '#A78BFA' }]}>
               {stats.average_score ? `${stats.average_score.toFixed(1)}%` : 'N/A'}
@@ -376,7 +383,7 @@ export default function AssessmentScreen() {
         <View style={styles.statCardWrapper}>
           <LinearGradient colors={['rgba(255,179,0,0.25)', 'rgba(255,160,0,0.08)']} style={styles.statCard}>
             <View style={[styles.statIconCircle, { backgroundColor: 'rgba(255,179,0,0.3)' }]}>
-              <Ionicons name="trophy-outline" size={18} color="#FFB300" />
+              <ProfessionalIcon name="trophy-outline" size={18} color="#FFB300" />
             </View>
             <Text style={[styles.statValue, { color: '#FCD34D' }]}>
               {stats.current_ai_score ? `${stats.current_ai_score.toFixed(1)}%` : 'N/A'}
@@ -396,12 +403,26 @@ export default function AssessmentScreen() {
         setModalStep(1);
         setShowUploadModal(true); 
       }}
+      activeOpacity={0.85}
     >
-      <LinearGradient colors={[item.color, item.color + 'CC']} style={styles.testGradient}>
-        <MaterialIcons name={item.icon} size={40} color="#fff" />
+      <View style={styles.testCardInner}>
+        {/* Accent bar */}
+        <View style={[styles.testCardAccent, { backgroundColor: item.accentColor }]} />
+        {/* Icon circle */}
+        <View style={[styles.testCardIconCircle, { backgroundColor: item.accentColor + '20' }]}>
+          <MaterialIcons name={item.icon} size={28} color={item.accentColor} />
+        </View>
+        {/* Tag */}
+        <View style={[styles.testCardTag, { backgroundColor: item.accentColor + '18' }]}>
+          <Text style={[styles.testCardTagText, { color: item.accentColor }]}>{item.tag}</Text>
+        </View>
         <Text style={styles.testName}>{item.name}</Text>
         <Text style={styles.testDescription}>{item.description}</Text>
-      </LinearGradient>
+        {/* Arrow */}
+        <View style={styles.testCardArrow}>
+          <MaterialIcons name="arrow-forward" size={16} color={item.accentColor} />
+        </View>
+      </View>
     </TouchableOpacity>
   );
 
@@ -450,7 +471,7 @@ export default function AssessmentScreen() {
               </View>
             ) : isFailed ? (
               <View style={[styles.richCardScoreCircle, { backgroundColor: '#ef444415', borderColor: '#ef444440' }]}>
-                <Ionicons name="warning" size={20} color="#ef4444" />
+                <ProfessionalIcon name="warning" size={20} color="#ef4444" />
               </View>
             ) : (
               <View style={[styles.richCardScoreCircle, {
@@ -468,7 +489,7 @@ export default function AssessmentScreen() {
           {/* Status or tip line */}
           {isProcessing && (
             <View style={styles.richCardTipRow}>
-              <Ionicons name="time-outline" size={13} color="#3b82f6" />
+              <ProfessionalIcon name="time-outline" size={13} color="#3b82f6" />
               <Text style={[styles.richCardTip, { color: '#3b82f6' }]}>
                 AI is analysing your video in the background…
               </Text>
@@ -476,7 +497,7 @@ export default function AssessmentScreen() {
           )}
           {isFailed && (
             <View style={styles.richCardTipRow}>
-              <Ionicons name="close-circle-outline" size={13} color="#ef4444" />
+              <ProfessionalIcon name="close-circle-outline" size={13} color="#ef4444" />
               <Text style={[styles.richCardTip, { color: '#ef4444' }]}>
                 Analysis failed — tap to see what went wrong
               </Text>
@@ -484,7 +505,7 @@ export default function AssessmentScreen() {
           )}
           {!isProcessing && !isFailed && tipLine.length > 0 && (
             <View style={styles.richCardTipRow}>
-              <Ionicons name="bulb-outline" size={13} color={scoreColor} />
+              <ProfessionalIcon name="bulb-outline" size={13} color={scoreColor} />
               <Text style={styles.richCardTip} numberOfLines={2}>{tipLine}</Text>
             </View>
           )}
@@ -547,7 +568,7 @@ export default function AssessmentScreen() {
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setSelectedAssessment(null)} style={styles.reportClose}>
-                <Ionicons name="close" size={20} color={Theme.colors.text} />
+                <ProfessionalIcon name="close" size={20} color={Theme.colors.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -578,7 +599,7 @@ export default function AssessmentScreen() {
             {/* Failed banner */}
             {isFailed && (
               <View style={styles.reportFailedBanner}>
-                <Ionicons name="alert-circle" size={24} color="#ef4444" />
+                <ProfessionalIcon name="alert-circle" size={24} color="#ef4444" />
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.failedTitle}>Analysis Failed</Text>
                   <Text style={styles.failedSubtitle}>
@@ -592,7 +613,7 @@ export default function AssessmentScreen() {
             {item.ai_feedback && (
               <View style={styles.reportFeedbackBlock}>
                 <View style={styles.reportSectionHeader}>
-                  <Ionicons name="document-text-outline" size={16} color={Theme.colors.primary} />
+                  <ProfessionalIcon name="document-text-outline" size={16} color={Theme.colors.primary} />
                   <Text style={styles.reportSectionTitle}>AI Feedback</Text>
                 </View>
                 <Text style={styles.reportFeedbackText}>
@@ -604,23 +625,23 @@ export default function AssessmentScreen() {
             {/* Test Info section */}
             <View style={styles.reportMetaBlock}>
               <View style={styles.reportSectionHeader}>
-                <Ionicons name="information-circle-outline" size={16} color={Theme.colors.primary} />
+                <ProfessionalIcon name="information-circle-outline" size={16} color={Theme.colors.primary} />
                 <Text style={styles.reportSectionTitle}>Test Details</Text>
               </View>
               <View style={styles.reportMetaRow}>
-                <Ionicons name="fitness-outline" size={14} color={Theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                <ProfessionalIcon name="fitness-outline" size={14} color={Theme.colors.textSecondary} style={{ marginRight: 8 }} />
                 <Text style={styles.reportMetaKey}>Test Type</Text>
                 <Text style={styles.reportMetaVal}>{testMeta?.name || item.test_type}</Text>
               </View>
               <View style={styles.reportMetaRow}>
-                <Ionicons name="checkmark-circle-outline" size={14} color={isFailed ? '#ef4444' : '#22c55e'} style={{ marginRight: 8 }} />
+                <ProfessionalIcon name="checkmark-circle-outline" size={14} color={isFailed ? '#ef4444' : '#22c55e'} style={{ marginRight: 8 }} />
                 <Text style={styles.reportMetaKey}>Status</Text>
                 <Text style={[styles.reportMetaVal, { color: isFailed ? '#ef4444' : '#22c55e' }]}>
                   {item.status?.charAt(0).toUpperCase() + item.status?.slice(1)}
                 </Text>
               </View>
               <View style={styles.reportMetaRow}>
-                <Ionicons name="calendar-outline" size={14} color={Theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                <ProfessionalIcon name="calendar-outline" size={14} color={Theme.colors.textSecondary} style={{ marginRight: 8 }} />
                 <Text style={styles.reportMetaKey}>Date &amp; Time</Text>
                 <Text style={styles.reportMetaVal}>
                   {new Date(item.created_at).toLocaleString()}
@@ -628,7 +649,7 @@ export default function AssessmentScreen() {
               </View>
               {item.ai_score != null && (
                 <View style={styles.reportMetaRow}>
-                  <Ionicons name="analytics-outline" size={14} color={Theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                  <ProfessionalIcon name="analytics-outline" size={14} color={Theme.colors.textSecondary} style={{ marginRight: 8 }} />
                   <Text style={styles.reportMetaKey}>AI Score</Text>
                   <Text style={[styles.reportMetaVal, { color: scoreColor, fontWeight: '800' }]}>
                     {item.ai_score.toFixed(1)}%
@@ -655,7 +676,7 @@ export default function AssessmentScreen() {
         >
           <View style={styles.resultToastInner}>
             <View style={styles.resultToastIcon}>
-              <Ionicons name="checkmark-circle" size={28} color="#22c55e" />
+              <ProfessionalIcon name="checkmark-circle" size={28} color="#22c55e" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.resultToastTitle}>
@@ -668,7 +689,7 @@ export default function AssessmentScreen() {
                 </Text>
               ) : null}
             </View>
-            <Ionicons name="close" size={18} color="rgba(255,255,255,0.5)" />
+            <ProfessionalIcon name="close" size={18} color="rgba(255,255,255,0.5)" />
           </View>
         </TouchableOpacity>
       )}
@@ -686,7 +707,7 @@ export default function AssessmentScreen() {
               <Text style={styles.uploadBannerTitle}>Analysing {uploadBanner.testName}…</Text>
               <Text style={styles.uploadBannerSub}>You'll get a notification when it's done.</Text>
             </View>
-            <Ionicons name="close" size={16} color="rgba(255,255,255,0.6)" />
+            <ProfessionalIcon name="close" size={16} color="rgba(255,255,255,0.6)" />
           </View>
         </TouchableOpacity>
       )}
@@ -735,7 +756,7 @@ export default function AssessmentScreen() {
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{selectedTest?.name}</Text>
                   <TouchableOpacity onPress={() => setShowUploadModal(false)}>
-                    <Ionicons name="close" size={24} color="#fff" />
+                    <ProfessionalIcon name="close" size={24} color="#fff" />
                   </TouchableOpacity>
                 </View>
 
@@ -744,7 +765,7 @@ export default function AssessmentScreen() {
                     {selectedTest?.instructions && (
                       <View style={styles.instructionsContainer}>
                         <View style={styles.faceWarningBox}>
-                          <Ionicons name="scan-outline" size={24} color="#60A5FA" />
+                          <ProfessionalIcon name="scan-outline" size={24} color="#60A5FA" />
                           <View style={styles.faceWarningTextCol}>
                             <Text style={styles.faceWarningTitle}>Face Verification Active</Text>
                             <Text style={styles.faceWarningDesc}>We will automatically verify your identity. Ensure your face is clearly visible at some point during the video.</Text>
@@ -764,18 +785,18 @@ export default function AssessmentScreen() {
                       onPress={() => setModalStep(2)}
                     >
                       <Text style={styles.nextButtonText}>Next</Text>
-                      <Ionicons name="arrow-forward" size={20} color="#fff" />
+                      <ProfessionalIcon name="arrow-forward" size={20} color="#fff" />
                     </TouchableOpacity>
                   </>
                 ) : (
                   <>
                     <TouchableOpacity style={styles.uploadOption} onPress={handleVideoUpload}>
-                      <Ionicons name="cloud-upload" size={32} color={Theme.colors.primary} />
+                      <ProfessionalIcon name="cloud-upload" size={32} color={Theme.colors.primary} />
                       <Text style={styles.uploadOptionText}>Upload Video</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.uploadOption} onPress={handleLiveRecording}>
-                      <Ionicons name="videocam" size={32} color={Theme.colors.secondary} />
+                      <ProfessionalIcon name="videocam" size={32} color={Theme.colors.secondary} />
                       <Text style={styles.uploadOptionText}>Record Live</Text>
                     </TouchableOpacity>
                     
@@ -783,7 +804,7 @@ export default function AssessmentScreen() {
                       style={styles.backButton} 
                       onPress={() => setModalStep(1)}
                     >
-                      <Ionicons name="arrow-back" size={20} color="#ccc" />
+                      <ProfessionalIcon name="arrow-back" size={20} color="#ccc" />
                       <Text style={styles.backButtonText}>Back to Instructions</Text>
                     </TouchableOpacity>
                   </>
@@ -810,7 +831,7 @@ export default function AssessmentScreen() {
               )}
               <View style={styles.cameraControls}>
                 <TouchableOpacity onPress={() => setShowCameraModal(false)}>
-                  <Ionicons name="close" size={30} color="#fff" />
+                  <ProfessionalIcon name="close" size={30} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.recordButton, isRecording && styles.recordingButton]} 
@@ -848,7 +869,11 @@ export default function AssessmentScreen() {
 // --- Styles (unchanged) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Theme.colors.background },
-  header: { padding: Theme.spacing.lg, paddingTop: Platform.OS === 'ios' ? 50 : 30, backgroundColor: Theme.colors.background },
+  header: {
+    padding: Theme.spacing.lg,
+    backgroundColor: Theme.colors.background,
+    // paddingTop is set dynamically using insets in the component
+  },
   headerTitle: { fontSize: 28, fontWeight: '900', color: Theme.colors.text, marginBottom: 4 },
   headerSubtitle: { fontSize: 14, color: Theme.colors.textSecondary, marginBottom: Theme.spacing.md },
   statsContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: Theme.spacing.sm, marginTop: 0 },
@@ -880,10 +905,59 @@ const styles = StyleSheet.create({
   section: { padding: Theme.spacing.lg },
   sectionTitle: { fontSize: 20, fontWeight: '700', color: Theme.colors.text, marginBottom: Theme.spacing.lg },
   testGrid: { justifyContent: 'space-between' },
-  testCard: { width: (SCREEN_WIDTH - Theme.spacing.lg * 3) / 2, marginBottom: Theme.spacing.md },
+  testCard: {
+    width: (SCREEN_WIDTH - Theme.spacing.lg * 3) / 2,
+    marginBottom: Theme.spacing.md,
+  },
+  testCardInner: {
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.lg,
+    padding: Theme.spacing.md,
+    height: 170,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  testCardAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: Theme.borderRadius.lg,
+    borderTopRightRadius: Theme.borderRadius.lg,
+  },
+  testCardIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Theme.spacing.sm,
+    marginBottom: Theme.spacing.sm,
+  },
+  testCardTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    marginBottom: 6,
+  },
+  testCardTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  testCardArrow: {
+    position: 'absolute',
+    bottom: Theme.spacing.sm,
+    right: Theme.spacing.sm,
+  },
   testGradient: { padding: Theme.spacing.lg, borderRadius: Theme.borderRadius.lg, alignItems: 'center', height: 160, justifyContent: 'center' },
-  testName: { fontSize: 16, fontWeight: '700', color: '#fff', marginTop: Theme.spacing.sm },
-  testDescription: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center', marginTop: 4 },
+  testName: { fontSize: 15, fontWeight: '800', color: Theme.colors.text, marginTop: 2 },
+  testDescription: { fontSize: 11, color: Theme.colors.textSecondary, marginTop: 3 },
   assessmentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Theme.spacing.md },
   assessmentTest: { fontSize: 16, fontWeight: '700', color: Theme.colors.text },
   assessmentDate: { fontSize: 13, color: Theme.colors.textSecondary },

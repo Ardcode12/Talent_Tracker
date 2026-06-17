@@ -1,7 +1,7 @@
 // components/ThemeToggle.tsx
 import React from 'react';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import { Theme } from '../constants/Theme';
 
 interface ThemeToggleProps {
@@ -13,7 +13,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ isDark, onToggle }) =>
   return (
     <TouchableOpacity onPress={onToggle} style={styles.container}>
       <View style={[styles.toggle, { backgroundColor: isDark ? Theme.colors.primary : Theme.colors.secondary }]}>
-        <Ionicons 
+        <ProfessionalIcon 
           name={isDark ? 'moon' : 'sunny'} 
           size={20} 
           color={Theme.colors.text} 

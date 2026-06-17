@@ -17,7 +17,8 @@ import {
   FlatList,
   Modal,
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
@@ -381,7 +382,7 @@ export default function ConnectionsScreen() {
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <BlurView intensity={80} style={styles.searchBlur}>
-          <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="search" size={20} color={Theme.colors.textSecondary} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by name, sport, or location..."
@@ -412,7 +413,7 @@ export default function ConnectionsScreen() {
             ]}
             onPress={() => setSelectedTab(tab.id)}
           >
-            <Ionicons
+            <ProfessionalIcon
               name={tab.icon as any}
               size={20}
               color={selectedTab === tab.id ? Theme.colors.text : Theme.colors.textSecondary}
@@ -480,7 +481,7 @@ export default function ConnectionsScreen() {
               {item.isOnline && <View style={styles.onlineIndicator} />}
               {item.verified && (
                 <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark" size={10} color="#fff" />
+                  <ProfessionalIcon name="checkmark" size={10} color="#fff" />
                 </View>
               )}
             </View>
@@ -494,12 +495,12 @@ export default function ConnectionsScreen() {
 
               <View style={styles.discoverMeta}>
                 <View style={styles.metaItem}>
-                  <Ionicons name="location" size={12} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="location" size={12} color={Theme.colors.textSecondary} />
                   <Text style={styles.metaText}>{item.location || 'Not specified'}</Text>
                 </View>
                 {item.experience && (
                   <View style={styles.metaItem}>
-                    <Ionicons name="time" size={12} color={Theme.colors.textSecondary} />
+                    <ProfessionalIcon name="time" size={12} color={Theme.colors.textSecondary} />
                     <Text style={styles.metaText}>{item.experience}y exp</Text>
                   </View>
                 )}
@@ -544,12 +545,12 @@ export default function ConnectionsScreen() {
           >
             {item.hasPendingRequest ? (
               <>
-                <Ionicons name="hourglass" size={18} color="#fff" />
+                <ProfessionalIcon name="hourglass" size={18} color="#fff" />
                 <Text style={styles.connectButtonText}>Request Pending</Text>
               </>
             ) : (
               <>
-                <Ionicons name="person-add" size={18} color="#fff" />
+                <ProfessionalIcon name="person-add" size={18} color="#fff" />
                 <Text style={styles.connectButtonText}>Connect</Text>
               </>
             )}
@@ -581,7 +582,7 @@ export default function ConnectionsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="people-outline" size={64} color={Theme.colors.textSecondary} />
             <Text style={styles.emptyStateTitle}>No users found</Text>
             <Text style={styles.emptyStateText}>
               Try adjusting your filters or search terms
@@ -607,7 +608,7 @@ export default function ConnectionsScreen() {
     if (pendingRequests.length === 0) {
       return (
         <View style={styles.emptyState}>
-          <Ionicons name="person-add-outline" size={64} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="person-add-outline" size={64} color={Theme.colors.textSecondary} />
           <Text style={styles.emptyStateTitle}>No pending requests</Text>
           <Text style={styles.emptyStateText}>
             When someone sends you a connection request, it will appear here
@@ -631,7 +632,7 @@ export default function ConnectionsScreen() {
 
               {request.mutualConnections > 0 && (
                 <View style={styles.mutualContainer}>
-                  <Ionicons name="people" size={14} color={Theme.colors.primary} />
+                  <ProfessionalIcon name="people" size={14} color={Theme.colors.primary} />
                   <Text style={styles.mutualText}>
                     {request.mutualConnections} mutual connections
                   </Text>
@@ -646,14 +647,14 @@ export default function ConnectionsScreen() {
                 style={styles.acceptButton}
                 onPress={() => handleAcceptRequest(request.id)}
               >
-                <Ionicons name="checkmark" size={18} color="#fff" />
+                <ProfessionalIcon name="checkmark" size={18} color="#fff" />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.rejectButton}
                 onPress={() => handleIgnoreRequest(request.id)}
               >
-                <Ionicons name="close" size={18} color={Theme.colors.textSecondary} />
+                <ProfessionalIcon name="close" size={18} color={Theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -674,7 +675,7 @@ export default function ConnectionsScreen() {
     if (filteredConnections.length === 0) {
       return (
         <View style={styles.emptyState}>
-          <Ionicons name="people-outline" size={64} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="people-outline" size={64} color={Theme.colors.textSecondary} />
           <Text style={styles.emptyStateTitle}>
             {searchText ? 'No connections found' : 'No connections yet'}
           </Text>
@@ -733,14 +734,14 @@ export default function ConnectionsScreen() {
                   style={styles.messageButton}
                   onPress={() => handleMessage(connection)}
                 >
-                  <Ionicons name="chatbubble" size={20} color={Theme.colors.primary} />
+                  <ProfessionalIcon name="chatbubble" size={20} color={Theme.colors.primary} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.moreButton}
                   onPress={() => handleRemoveConnection(connection.id)}
                 >
-                  <Ionicons name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="ellipsis-vertical" size={20} color={Theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -755,7 +756,7 @@ export default function ConnectionsScreen() {
     if (groups.length === 0) {
       return (
         <View style={styles.emptyState}>
-          <Ionicons name="people-circle-outline" size={64} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="people-circle-outline" size={64} color={Theme.colors.textSecondary} />
           <Text style={styles.emptyStateTitle}>No groups available</Text>
           <Text style={styles.emptyStateText}>
             Groups and academies will appear here when available
@@ -780,7 +781,7 @@ export default function ConnectionsScreen() {
               </Text>
 
               <View style={styles.groupFullStats}>
-                <Ionicons name="people" size={16} color={Theme.colors.textSecondary} />
+                <ProfessionalIcon name="people" size={16} color={Theme.colors.textSecondary} />
                 <Text style={styles.groupFullMembers}>{group.memberCount} members</Text>
               </View>
 
@@ -820,7 +821,7 @@ export default function ConnectionsScreen() {
                   style={styles.modalCloseButton}
                   onPress={() => setShowUserModal(false)}
                 >
-                  <Ionicons name="close" size={24} color={Theme.colors.text} />
+                  <ProfessionalIcon name="close" size={24} color={Theme.colors.text} />
                 </TouchableOpacity>
 
                 <Image
@@ -830,7 +831,7 @@ export default function ConnectionsScreen() {
 
                 {selectedUser.verified && (
                   <View style={styles.modalVerifiedBadge}>
-                    <Ionicons name="checkmark-circle" size={24} color={Theme.colors.primary} />
+                    <ProfessionalIcon name="checkmark-circle" size={24} color={Theme.colors.primary} />
                   </View>
                 )}
 
@@ -861,19 +862,19 @@ export default function ConnectionsScreen() {
                   <View style={styles.modalDetails}>
                     {selectedUser.location && (
                       <View style={styles.modalDetailItem}>
-                        <Ionicons name="location" size={16} color={Theme.colors.textSecondary} />
+                        <ProfessionalIcon name="location" size={16} color={Theme.colors.textSecondary} />
                         <Text style={styles.modalDetailText}>{selectedUser.location}</Text>
                       </View>
                     )}
                     {selectedUser.age && (
                       <View style={styles.modalDetailItem}>
-                        <Ionicons name="calendar" size={16} color={Theme.colors.textSecondary} />
+                        <ProfessionalIcon name="calendar" size={16} color={Theme.colors.textSecondary} />
                         <Text style={styles.modalDetailText}>{selectedUser.age} years old</Text>
                       </View>
                     )}
                     {selectedUser.experience && (
                       <View style={styles.modalDetailItem}>
-                        <Ionicons name="time" size={16} color={Theme.colors.textSecondary} />
+                        <ProfessionalIcon name="time" size={16} color={Theme.colors.textSecondary} />
                         <Text style={styles.modalDetailText}>{selectedUser.experience} years experience</Text>
                       </View>
                     )}
@@ -918,12 +919,12 @@ export default function ConnectionsScreen() {
                   >
                     {selectedUser.hasPendingRequest ? (
                       <>
-                        <Ionicons name="hourglass" size={20} color="#fff" />
+                        <ProfessionalIcon name="hourglass" size={20} color="#fff" />
                         <Text style={styles.modalConnectText}>Request Pending</Text>
                       </>
                     ) : (
                       <>
-                        <Ionicons name="person-add" size={20} color="#fff" />
+                        <ProfessionalIcon name="person-add" size={20} color="#fff" />
                         <Text style={styles.modalConnectText}>Send Connection Request</Text>
                       </>
                     )}

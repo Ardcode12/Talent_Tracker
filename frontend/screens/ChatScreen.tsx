@@ -14,7 +14,7 @@ import {
   Alert,
   Keyboard,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import { Theme } from '../constants/Theme';
 import {
@@ -309,7 +309,7 @@ export default function ChatScreen({ route, navigation }) {
                   </Text>
                   
                   {isOwnMessage && (
-                    <Ionicons 
+                    <ProfessionalIcon 
                       name={item.is_read ? "checkmark-done" : "checkmark"} 
                       size={14} 
                       color={item.is_read ? "#4CAF50" : "rgba(255,255,255,0.5)"} 
@@ -336,7 +336,7 @@ export default function ChatScreen({ route, navigation }) {
         style={styles.backButton}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Ionicons name="arrow-back" size={24} color={Theme.colors.text} />
+        <ProfessionalIcon name="arrow-back" size={24} color={Theme.colors.text} />
       </TouchableOpacity>
       
       <TouchableOpacity 
@@ -365,7 +365,7 @@ export default function ChatScreen({ route, navigation }) {
       </TouchableOpacity>
       
       <TouchableOpacity style={styles.moreButton}>
-        <Ionicons name="ellipsis-vertical" size={24} color={Theme.colors.text} />
+        <ProfessionalIcon name="ellipsis-vertical" size={24} color={Theme.colors.text} />
       </TouchableOpacity>
     </View>
   );
@@ -408,7 +408,7 @@ export default function ChatScreen({ route, navigation }) {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubble-outline" size={60} color={Theme.colors.textSecondary} />
+            <ProfessionalIcon name="chatbubble-outline" size={60} color={Theme.colors.textSecondary} />
             <Text style={styles.emptyText}>No messages yet</Text>
             <Text style={styles.emptySubtext}>
               Send a message to start the conversation!
@@ -424,7 +424,7 @@ export default function ChatScreen({ route, navigation }) {
       {/* Input Area */}
       <View style={[styles.inputContainer, keyboardVisible && styles.inputContainerKeyboard]}>
         <TouchableOpacity style={styles.attachButton}>
-          <Ionicons name="attach" size={24} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="attach" size={24} color={Theme.colors.textSecondary} />
         </TouchableOpacity>
         
         <TextInput
@@ -449,7 +449,7 @@ export default function ChatScreen({ route, navigation }) {
           {sending ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Ionicons name="send" size={20} color="#fff" />
+            <ProfessionalIcon name="send" size={20} color="#fff" />
           )}
         </TouchableOpacity>
       </View>

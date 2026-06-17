@@ -117,9 +117,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: Theme.borderRadius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-  },
+          borderWidth: 8,
+          borderColor: 'rgba(255, 255, 255, 0.25)'
+        },
   glowEffect: {
     position: 'absolute',
     top: -50,

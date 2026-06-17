@@ -16,7 +16,8 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import Animated, { FadeInDown, FadeIn, FadeInRight } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { Theme } from '../constants/Theme';
@@ -186,14 +187,14 @@ const navigateToAthleteProfile = (athlete) => {
             style={styles.headerIconButton}
             onPress={() => setShowSearchModal(true)}
           >
-            <Ionicons name="search" size={22} color="#fff" />
+            <ProfessionalIcon name="search" size={22} color="#fff" />
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.headerIconButton}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Ionicons name="notifications-outline" size={22} color="#fff" />
+            <ProfessionalIcon name="notifications-outline" size={22} color="#fff" />
             {(stats?.pending_requests > 0 || notificationCount > 0) && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
@@ -239,7 +240,7 @@ const navigateToAthleteProfile = (athlete) => {
           onPress={() => navigation.navigate('Assessments')}
         >
           <View style={[styles.statsCardIcon, { backgroundColor: '#2ecc7120' }]}>
-            <Ionicons name="clipboard-outline" size={22} color="#2ecc71" />
+            <ProfessionalIcon name="clipboard-outline" size={22} color="#2ecc71" />
           </View>
           <Text style={styles.statsCardNumber}>
             {stats?.total_assessments || 0}
@@ -252,7 +253,7 @@ const navigateToAthleteProfile = (athlete) => {
           onPress={() => navigation.navigate('ConnectionRequests')}
         >
           <View style={[styles.statsCardIcon, { backgroundColor: '#e74c3c20' }]}>
-            <Ionicons name="git-pull-request" size={22} color="#e74c3c" />
+            <ProfessionalIcon name="git-pull-request" size={22} color="#e74c3c" />
           </View>
           <Text style={styles.statsCardNumber}>
             {stats?.pending_requests || 0}
@@ -265,7 +266,7 @@ const navigateToAthleteProfile = (athlete) => {
           onPress={() => navigation.navigate('Messages')}
         >
           <View style={[styles.statsCardIcon, { backgroundColor: '#3498db20' }]}>
-            <Ionicons name="chatbubbles-outline" size={22} color="#3498db" />
+            <ProfessionalIcon name="chatbubbles-outline" size={22} color="#3498db" />
           </View>
           <Text style={styles.statsCardNumber}>{unreadMessages}</Text>
           <Text style={styles.statsCardLabel}>Messages</Text>
@@ -297,7 +298,7 @@ const navigateToAthleteProfile = (athlete) => {
             colors={['#667eea', '#764ba2']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="analytics" size={26} color="#fff" />
+            <ProfessionalIcon name="analytics" size={26} color="#fff" />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Assessments</Text>
         </TouchableOpacity>
@@ -323,7 +324,7 @@ const navigateToAthleteProfile = (athlete) => {
             colors={['#f093fb', '#f5576c']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="search" size={26} color="#fff" />
+            <ProfessionalIcon name="search" size={26} color="#fff" />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Find</Text>
         </TouchableOpacity>
@@ -336,7 +337,7 @@ const navigateToAthleteProfile = (athlete) => {
             colors={['#4facfe', '#00f2fe']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="chatbubbles" size={26} color="#fff" />
+            <ProfessionalIcon name="chatbubbles" size={26} color="#fff" />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Messages</Text>
         </TouchableOpacity>
@@ -349,7 +350,7 @@ const navigateToAthleteProfile = (athlete) => {
             colors={['#ff6b6b', '#ee5a5a']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="notifications" size={26} color="#fff" />
+            <ProfessionalIcon name="notifications" size={26} color="#fff" />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Alerts</Text>
         </TouchableOpacity>
@@ -362,7 +363,7 @@ const navigateToAthleteProfile = (athlete) => {
             colors={['#fa709a', '#fee140']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="person" size={26} color="#fff" />
+            <ProfessionalIcon name="person" size={26} color="#fff" />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Profile</Text>
         </TouchableOpacity>
@@ -420,7 +421,7 @@ const navigateToAthleteProfile = (athlete) => {
                   {athlete.is_online && <View style={styles.onlineIndicator} />}
                   {athlete.is_verified && (
                     <View style={styles.verifiedBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
+                      <ProfessionalIcon name="checkmark-circle" size={16} color="#2ecc71" />
                     </View>
                   )}
                 </View>
@@ -513,7 +514,7 @@ const navigateToAthleteProfile = (athlete) => {
         </ScrollView>
       ) : (
         <View style={styles.emptyStateSmall}>
-          <Ionicons name="people-outline" size={30} color={Theme.colors.textSecondary} />
+          <ProfessionalIcon name="people-outline" size={30} color={Theme.colors.textSecondary} />
           <Text style={styles.emptyStateTextSmall}>No active athletes</Text>
         </View>
       )}
@@ -562,7 +563,7 @@ const navigateToAthleteProfile = (athlete) => {
             </View>
             
             <View style={styles.improvementBadge}>
-              <Ionicons name="trending-up" size={14} color="#fff" />
+              <ProfessionalIcon name="trending-up" size={14} color="#fff" />
               <Text style={styles.improvementText}>+{item.improvement}%</Text>
             </View>
           </TouchableOpacity>
@@ -628,7 +629,7 @@ const navigateToAthleteProfile = (athlete) => {
             onPress={() => setShowSearchModal(true)}
           >
             <View style={styles.addAthleteIcon}>
-              <Ionicons name="add" size={30} color="#667eea" />
+              <ProfessionalIcon name="add" size={30} color="#667eea" />
             </View>
             <Text style={styles.addAthleteText}>Find More</Text>
           </TouchableOpacity>

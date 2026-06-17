@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
+import { ProfessionalIcon } from './ui/ProfessionalIcon';
 import { Theme } from '../constants/Theme';
 
 interface FilterOption {
@@ -53,7 +53,7 @@ export const OpportunityFilterModal: React.FC<FilterModalProps> = ({
               option.active && styles.filterOptionTextActive
             ]}>{option.label}</Text>
             {option.active && (
-              <Ionicons name="checkmark" size={16} color={Theme.colors.text} />
+              <ProfessionalIcon name="checkmark" size={16} color={Theme.colors.text} />
             )}
           </TouchableOpacity>
         ))}
@@ -68,7 +68,7 @@ export const OpportunityFilterModal: React.FC<FilterModalProps> = ({
       <View style={styles.header}>
         <Text style={styles.title}>Filters</Text>
         <TouchableOpacity onPress={onClose}>
-          <Ionicons name="close" size={24} color={Theme.colors.text} />
+          <ProfessionalIcon name="close" size={24} color={Theme.colors.text} />
         </TouchableOpacity>
       </View>
       

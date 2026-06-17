@@ -15,7 +15,8 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ProfessionalIcon } from '../components/ui/ProfessionalIcon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Theme } from '../constants/Theme';
@@ -293,7 +294,7 @@ export default function OpportunitiesScreen() {
           {/* Search Bar */}
           <View style={styles.searchContainer}>
             <BlurView intensity={80} style={styles.searchBlur}>
-              <Ionicons name="search" size={20} color={Theme.colors.textSecondary} />
+              <ProfessionalIcon name="search" size={20} color={Theme.colors.textSecondary} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search opportunities..."
@@ -302,7 +303,7 @@ export default function OpportunitiesScreen() {
                 onChangeText={setSearchText}
               />
               <TouchableOpacity onPress={() => setShowFilterModal(true)}>
-                <Ionicons name="filter" size={20} color={Theme.colors.primary} />
+                <ProfessionalIcon name="filter" size={20} color={Theme.colors.primary} />
               </TouchableOpacity>
             </BlurView>
           </View>
@@ -388,7 +389,7 @@ export default function OpportunitiesScreen() {
           
           <View style={styles.featuredContent}>
             <View style={styles.featuredBadge}>
-              <Ionicons name="star" size={16} color={Theme.colors.accent} />
+              <ProfessionalIcon name="star" size={16} color={Theme.colors.accent} />
               <Text style={styles.featuredBadgeText}>FEATURED</Text>
             </View>
             
@@ -397,11 +398,11 @@ export default function OpportunitiesScreen() {
             
             <View style={styles.featuredDetails}>
               <View key="location" style={styles.featuredDetailItem}>
-                <Ionicons name="location" size={16} color={Theme.colors.text} />
+                <ProfessionalIcon name="location" size={16} color={Theme.colors.text} />
                 <Text style={styles.featuredDetailText}>{FEATURED_OPPORTUNITY.location}</Text>
               </View>
               <View key="calendar" style={styles.featuredDetailItem}>
-                <Ionicons name="calendar" size={16} color={Theme.colors.text} />
+                <ProfessionalIcon name="calendar" size={16} color={Theme.colors.text} />
                 <Text style={styles.featuredDetailText}>{FEATURED_OPPORTUNITY.dateTime}</Text>
               </View>
             </View>
@@ -420,7 +421,7 @@ export default function OpportunitiesScreen() {
             
             <TouchableOpacity style={styles.featuredButton}>
               <Text style={styles.featuredButtonText}>Apply Now</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
+              <ProfessionalIcon name="arrow-forward" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -462,15 +463,15 @@ export default function OpportunitiesScreen() {
               
               <View style={styles.cardDetails}>
                 <View key={`${item.id}-location`} style={styles.cardDetailRow}>
-                  <Ionicons name="location-outline" size={14} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="location-outline" size={14} color={Theme.colors.textSecondary} />
                   <Text style={styles.cardDetailText}>{item.location}</Text>
                 </View>
                 <View key={`${item.id}-calendar`} style={styles.cardDetailRow}>
-                  <Ionicons name="calendar-outline" size={14} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="calendar-outline" size={14} color={Theme.colors.textSecondary} />
                   <Text style={styles.cardDetailText}>{item.dateTime}</Text>
                 </View>
                 <View key={`${item.id}-people`} style={styles.cardDetailRow}>
-                  <Ionicons name="people-outline" size={14} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="people-outline" size={14} color={Theme.colors.textSecondary} />
                   <Text style={styles.cardDetailText}>{item.eligibility}</Text>
                 </View>
               </View>
@@ -495,7 +496,7 @@ export default function OpportunitiesScreen() {
                   style={[styles.saveButton, isSaved && styles.savedButton]}
                   onPress={() => handleSaveOpportunity(item.id)}
                 >
-                  <Ionicons 
+                  <ProfessionalIcon 
                     name={isSaved ? "bookmark" : "bookmark-outline"} 
                     size={20} 
                     color={isSaved ? Theme.colors.accent : Theme.colors.text} 
@@ -513,7 +514,7 @@ export default function OpportunitiesScreen() {
                   <Text style={styles.applyButtonText}>
                     {isApplied ? 'Applied' : 'Apply Now'}
                   </Text>
-                  {!isApplied && <Ionicons name="arrow-forward" size={16} color="#fff" />}
+                  {!isApplied && <ProfessionalIcon name="arrow-forward" size={16} color="#fff" />}
                 </TouchableOpacity>
               </View>
             </View>
@@ -550,7 +551,7 @@ export default function OpportunitiesScreen() {
           <View style={styles.benefitsList}>
             {scholarship.benefits.map((benefit, i) => (
               <View key={`benefit-${scholarship.id}-${i}`} style={styles.benefitItem}>
-                <Ionicons name="checkmark-circle" size={16} color={Theme.colors.success} />
+                <ProfessionalIcon name="checkmark-circle" size={16} color={Theme.colors.success} />
                 <Text style={styles.benefitText}>{benefit}</Text>
               </View>
             ))}
@@ -586,11 +587,11 @@ export default function OpportunitiesScreen() {
           
           <View style={styles.campDetails}>
             <View key={`${camp.id}-location`} style={styles.campDetailItem}>
-              <Ionicons name="location" size={12} color={Theme.colors.textSecondary} />
+              <ProfessionalIcon name="location" size={12} color={Theme.colors.textSecondary} />
               <Text style={styles.campDetailText}>{camp.location}</Text>
             </View>
             <View key={`${camp.id}-calendar`} style={styles.campDetailItem}>
-              <Ionicons name="calendar" size={12} color={Theme.colors.textSecondary} />
+              <ProfessionalIcon name="calendar" size={12} color={Theme.colors.textSecondary} />
               <Text style={styles.campDetailText}>{camp.dateTime}</Text>
             </View>
           </View>
@@ -646,13 +647,13 @@ export default function OpportunitiesScreen() {
                 <Text style={styles.aiCardReason}>{rec.eligibility}</Text>
                 
                 <View key={`ai-detail-${rec.id}`} style={styles.aiCardDetails}>
-                  <Ionicons name="location" size={14} color={Theme.colors.textSecondary} />
+                  <ProfessionalIcon name="location" size={14} color={Theme.colors.textSecondary} />
                   <Text style={styles.aiCardDetailText}>{rec.location}</Text>
                 </View>
                 
                 <TouchableOpacity style={styles.aiApplyButton}>
                   <Text style={styles.aiApplyText}>Apply</Text>
-                  <Ionicons name="arrow-forward" size={14} color="#fff" />
+                  <ProfessionalIcon name="arrow-forward" size={14} color="#fff" />
                 </TouchableOpacity>
               </View>
             </NeonGlowView>
@@ -673,7 +674,7 @@ export default function OpportunitiesScreen() {
         <View style={styles.statsContainer}>
           <View key="stat-applied" style={styles.statCard}>
             <View style={[styles.statIconContainer, { backgroundColor: Theme.colors.primary + '20' }]}>
-              <Ionicons name="paper-plane" size={24} color={Theme.colors.primary} />
+              <ProfessionalIcon name="paper-plane" size={24} color={Theme.colors.primary} />
             </View>
             <Text style={styles.statNumber}>{appliedOpportunities.length}</Text>
             <Text style={styles.statLabel}>Applied</Text>
@@ -681,7 +682,7 @@ export default function OpportunitiesScreen() {
           
           <View key="stat-saved" style={styles.statCard}>
             <View style={[styles.statIconContainer, { backgroundColor: Theme.colors.accent + '20' }]}>
-              <Ionicons name="bookmark" size={24} color={Theme.colors.accent} />
+              <ProfessionalIcon name="bookmark" size={24} color={Theme.colors.accent} />
             </View>
             <Text style={styles.statNumber}>{savedOpportunities.length}</Text>
             <Text style={styles.statLabel}>Saved</Text>
@@ -689,7 +690,7 @@ export default function OpportunitiesScreen() {
           
           <View key="stat-selected" style={styles.statCard}>
             <View style={[styles.statIconContainer, { backgroundColor: Theme.colors.success + '20' }]}>
-              <Ionicons name="checkmark-circle" size={24} color={Theme.colors.success} />
+              <ProfessionalIcon name="checkmark-circle" size={24} color={Theme.colors.success} />
             </View>
             <Text style={styles.statNumber}>2</Text>
             <Text style={styles.statLabel}>Selected</Text>
@@ -711,13 +712,13 @@ export default function OpportunitiesScreen() {
         />
         <View style={styles.notificationContent}>
           <View style={styles.notificationIcon}>
-            <Ionicons name="notifications" size={20} color="#fff" />
+            <ProfessionalIcon name="notifications" size={20} color="#fff" />
           </View>
           <View style={styles.notificationText}>
             <Text style={styles.notificationTitle}>3 New Opportunities in Athletics</Text>
             <Text style={styles.notificationSubtitle}>1 scholarship deadline approaching</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
+          <ProfessionalIcon name="chevron-forward" size={20} color="#fff" />
         </View>
       </TouchableOpacity>
     </ScrollAnimatedView>
@@ -811,7 +812,7 @@ export default function OpportunitiesScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filters</Text>
               <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <Ionicons name="close" size={24} color={Theme.colors.text} />
+                <ProfessionalIcon name="close" size={24} color={Theme.colors.text} />
               </TouchableOpacity>
             </View>
             {/* Add filter options here */}
