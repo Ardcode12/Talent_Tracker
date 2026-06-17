@@ -25,9 +25,7 @@ env/
 # User uploads (images, docs, etc.)
 backend/uploads/
 
-# -----------------------------
-# Node / React Native (frontend/)
-# -----------------------------
+
 node_modules/
 npm-debug.log*
 yarn-debug.log*
